@@ -92,24 +92,22 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
         </div>
 
         {/* Bill Summary */}
-        <div className="bg-white/90 p-4 rounded-2xl border border-emerald-200 mb-5 space-y-1.5 text-xs">
+        <div className="bg-white/90 p-4 rounded-2xl border border-emerald-200 mb-5 space-y-2 text-xs">
           <div className="flex justify-between items-center text-slate-500">
-            <span>Beneficiary / مستحق شخص:</span>
-            <span className="font-bold text-slate-900">{bill.personName}</span>
+            <span>Bill Category / بل کی قسم:</span>
+            <span className="font-bold text-slate-900">{bill.bill_type}</span>
           </div>
           <div className="flex justify-between items-center text-slate-500">
             <span>Bill Reference / ریفرنس نمبر:</span>
-            <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
-              {bill.referenceId}
+            <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+              {bill.reference_no}
             </span>
           </div>
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Account / اکاؤنٹ نمبر:</span>
-            <span className="font-mono font-semibold text-slate-800">{bill.accountNumber}</span>
-          </div>
-          <div className="flex justify-between items-center text-slate-700 font-bold border-t border-slate-100 pt-1.5 text-sm">
+          <div className="flex justify-between items-center text-slate-700 font-bold border-t border-slate-100 pt-2 text-sm">
             <span>Amount Paid / ادا شدہ رقم:</span>
-            <span className="text-emerald-700 font-black">{bill.amount}</span>
+            <span className="text-emerald-700 font-black">
+              {typeof bill.amount === 'number' ? `Rs. ${bill.amount.toLocaleString()}` : `Rs. ${bill.amount}`}
+            </span>
           </div>
         </div>
 

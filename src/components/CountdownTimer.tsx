@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 
 interface CountdownTimerProps {
-  expiresAt: number;
+  createdAt?: string;
+  expiresAt?: number;
   className?: string;
 }
 
-export const CountdownTimer: React.FC<CountdownTimerProps> = ({ expiresAt, className = '' }) => {
+export const CountdownTimer: React.FC<CountdownTimerProps> = ({ createdAt, expiresAt, className = '' }) => {
+  const targetTime = expiresAt || (createdAt ? new Date(createdAt).getTime() + 48 * 60 * 60 * 1000 : Date.now() + 48 * 60 * 60 * 1000);
+
   const [timeLeft, setTimeLeft] = useState<{
     hours: number;
     minutes: number;
@@ -22,7 +25,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({ expiresAt, class
   useEffect(() => {
     const updateCountdown = () => {
       const now = Date.now();
-      const diff = expiresAt - now;
+      const diff = targetTime - now;
 
       if (diff <= 0) {
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
@@ -40,7 +43,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({ expiresAt, class
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt]);
+  }, [targetTime]);
 
   const pad = (n: number) => n.toString().padStart(2, '0');
 
@@ -52,7 +55,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({ expiresAt, class
       <Clock size={13} className="text-[#059669] shrink-0 timer-indicator" />
       <span className="font-mono text-emerald-950 text-xs font-black tabular-nums">
         {timeLeft.isExpired ? (
-          <span className="text-rose-600">Time Extended / وقت بڑھا دیا گیا</span>
+          <span className="text-rose-600">Urgent Extended / وقت بڑھ گیا</span>
         ) : (
           `${pad(timeLeft.hours)}:${pad(timeLeft.minutes)}:${pad(timeLeft.seconds)}`
         )}

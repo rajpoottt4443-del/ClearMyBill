@@ -1,39 +1,69 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrandHeader } from './components/BrandHeader';
 import { SimpleUploadBox } from './components/SimpleUploadBox';
 import { LiveUnpaidBillsGrid } from './components/LiveUnpaidBillsGrid';
 import { BillZoomModal } from './components/BillZoomModal';
 import { ReceiptUploadModal } from './components/ReceiptUploadModal';
 import { SimpleFooter } from './components/SimpleFooter';
-import { BillItem } from './types/bill';
-import {
-  loadStoredBills,
-  saveStoredBills,
-  loadClearedBillsArchive,
-  saveClearedBillsArchive
-} from './data/mockBills';
-import { CheckCircle2, X, Sparkles } from 'lucide-react';
+import { BillItem, NewBillPayload } from './types/bill';
+import { fetchUnpaidBills, fetchPaidBills, insertBill, markBillAsPaid } from './services/billService';
+import { supabase } from './lib/supabase';
+import { X, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [bills, setBills] = useState<BillItem[]>([]);
   const [clearedBills, setClearedBills] = useState<BillItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [zoomedBill, setZoomedBill] = useState<BillItem | null>(null);
   const [payingBill, setPayingBill] = useState<BillItem | null>(null);
   const [confirmationBanner, setConfirmationBanner] = useState<string | null>(null);
 
-  useEffect(() => {
-    setBills(loadStoredBills());
-    setClearedBills(loadClearedBillsArchive());
+  // Load live data from Supabase
+  const loadBillsFromSupabase = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [unpaid, paid] = await Promise.all([
+        fetchUnpaidBills(),
+        fetchPaidBills(),
+      ]);
+      setBills(unpaid);
+      setClearedBills(paid);
+    } catch (err) {
+      console.error('Failed to load bills from Supabase:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const handleBillSubmitted = (newBill: BillItem) => {
-    const updated = [newBill, ...bills];
-    setBills(updated);
-    saveStoredBills(updated);
+  useEffect(() => {
+    loadBillsFromSupabase();
 
-    // Show confirmation
+    // Setup Supabase Realtime channel for live updates across all devices & mobile phones
+    const channel = supabase
+      .channel('bills_realtime_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bills' },
+        (payload) => {
+          console.log('Realtime change received from Supabase:', payload);
+          loadBillsFromSupabase();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadBillsFromSupabase]);
+
+  // Insert bill into Supabase
+  const handleBillSubmitted = async (payload: NewBillPayload) => {
+    const saved = await insertBill(payload);
+    // Optimistically update list
+    setBills((prev) => [saved, ...prev.filter((b) => b.id !== saved.id)]);
+
     showConfirmation(
-      'Your bill has been uploaded successfully! It will be paid within 48 hours. / آپ کا بل کامیابی سے اپلوڈ ہو گیا ہے، انشاءاللہ 48 گھنٹے میں ادا ہو جائے گا۔'
+      'Your bill has been uploaded successfully! It is saved in Supabase and visible on all devices. / آپ کا بل کامیابی سے ڈیٹا بیس میں محفوظ ہو گیا ہے اور تمام ڈیوائسز پر لائیو ہو چکا ہے۔'
     );
 
     // Smooth scroll down to unpaid bills grid
@@ -42,31 +72,28 @@ export default function App() {
     }, 300);
   };
 
-  const handleReceiptUploaded = (billId: string, receiptData: string, donorName?: string) => {
-    const billToClear = bills.find((b) => b.id === billId);
-    if (!billToClear) return;
+  // Mark bill as paid in Supabase (removes from active unpaid list)
+  const handleReceiptUploaded = async (billId: string, receiptData: string, donorName?: string) => {
+    const targetBill = bills.find((b) => b.id === billId);
+    if (!targetBill) return;
 
-    // Instant Auto-Delete Logic: Remove bill from active unpaid bills list
-    const updatedUnpaid = bills.filter((b) => b.id !== billId);
-    setBills(updatedUnpaid);
-    saveStoredBills(updatedUnpaid);
+    // Optimistically remove from unpaid list
+    setBills((prev) => prev.filter((b) => b.id !== billId));
+    setClearedBills((prev) => [{ ...targetBill, status: 'paid' }, ...prev]);
 
-    // Add to cleared bills archive for transparency & record
-    const clearedItem: BillItem = {
-      ...billToClear,
-      status: 'paid_removed',
-      paidReceiptUrl: receiptData,
-      paidAt: Date.now(),
-      donorNote: donorName || 'Kind Donor'
-    };
-    const updatedCleared = [clearedItem, ...clearedBills];
-    setClearedBills(updatedCleared);
-    saveClearedBillsArchive(updatedCleared);
-
-    // Show requested exact confirmation message
-    showConfirmation(
-      'JazakAllah / Thank you! Payment receipt uploaded & bill automatically removed / شکریہ! رسید اپلوڈ ہو گئی ہے اور بل لسٹ سے ہٹا دیا گیا ہے۔'
-    );
+    try {
+      await markBillAsPaid(billId);
+      showConfirmation(
+        'JazakAllah / Thank you! Payment receipt uploaded & bill automatically removed / شکریہ! رسید اپلوڈ ہو گئی ہے اور بل لسٹ سے ہٹا دیا گیا ہے۔'
+      );
+    } catch (err: any) {
+      console.error('Error updating status in Supabase:', err);
+      // Refresh to sync with actual state
+      loadBillsFromSupabase();
+      showConfirmation(
+        'Notice: Payment received. Synchronizing with cloud database... / رسید موصول ہو گئی ہے، ڈیٹا سنک ہو رہا ہے۔'
+      );
+    }
   };
 
   const showConfirmation = (msg: string) => {
@@ -132,6 +159,8 @@ export default function App() {
         <LiveUnpaidBillsGrid
           bills={bills}
           clearedBills={clearedBills}
+          isLoading={isLoading}
+          onRefresh={loadBillsFromSupabase}
           onOpenZoom={(bill) => setZoomedBill(bill)}
           onOpenReceiptUpload={(bill) => setPayingBill(bill)}
         />

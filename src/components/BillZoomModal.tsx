@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, ShieldCheck, Download } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { BillPhotoPreview } from './BillPhotoPreview';
 
@@ -17,20 +17,19 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
   onPayClick,
 }) => {
   const [copiedRef, setCopiedRef] = useState(false);
-  const [copiedAccount, setCopiedAccount] = useState(false);
 
   if (!isOpen || !bill) return null;
 
-  const handleCopy = (text: string, isRef: boolean) => {
+  const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    if (isRef) {
-      setCopiedRef(true);
-      setTimeout(() => setCopiedRef(false), 2000);
-    } else {
-      setCopiedAccount(true);
-      setTimeout(() => setCopiedAccount(false), 2000);
-    }
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
   };
+
+  const formattedAmount =
+    typeof bill.amount === 'number'
+      ? `Rs. ${bill.amount.toLocaleString()}`
+      : `Rs. ${bill.amount}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/55 backdrop-blur-md animate-in fade-in duration-200">
@@ -49,60 +48,41 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
             Bill Photo & Verification / بل کی مکمل تفصیل
           </div>
           <h3 className="text-xl font-black text-black mt-0.5">
-            {bill.personName}
+            {bill.bill_type}
           </h3>
           <div className="text-xs text-slate-600 mt-0.5">
-            {bill.billType} ({bill.billTypeUrdu}) · Amount: <strong className="text-emerald-800 text-sm">{bill.amount}</strong>
+            Amount: <strong className="text-emerald-800 text-sm">{formattedAmount}</strong>
           </div>
         </div>
 
         {/* Large Bill Preview */}
         <div className="my-4">
           <BillPhotoPreview
-            photoKey={bill.billPhotoUrl}
-            referenceId={bill.referenceId}
-            personName={bill.personName}
+            photoKey={bill.image_url}
+            referenceId={bill.reference_no}
             amount={bill.amount}
-            billType={bill.billType}
+            billType={bill.bill_type}
             className="w-full"
           />
         </div>
 
-        {/* 1-Click Copy Reference ID & Account */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
-          <div className="bg-white/90 p-3 rounded-2xl border border-emerald-200 flex items-center justify-between">
+        {/* 1-Click Copy Reference ID */}
+        <div className="my-4">
+          <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-200 flex items-center justify-between">
             <div className="truncate mr-2">
               <span className="text-[10px] font-bold text-slate-500 block">
-                Bill Reference ID / بل کا ریفرنس
+                Bill Reference ID / بل کا ریفرنس نمبر
               </span>
-              <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 truncate block">
-                {bill.referenceId}
+              <span className="font-mono font-bold text-sm text-slate-900 truncate block">
+                {bill.reference_no}
               </span>
             </div>
             <button
-              onClick={() => handleCopy(bill.referenceId, true)}
-              className="clay-mint-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+              onClick={() => handleCopy(bill.reference_no)}
+              className="clay-mint-btn px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
               {copiedRef ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedRef ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
-
-          <div className="bg-white/90 p-3 rounded-2xl border border-emerald-200 flex items-center justify-between">
-            <div className="truncate mr-2">
-              <span className="text-[10px] font-bold text-slate-500 block">
-                Account / JazzCash / اکاؤنٹ نمبر
-              </span>
-              <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 truncate block">
-                {bill.accountNumber}
-              </span>
-            </div>
-            <button
-              onClick={() => handleCopy(bill.accountNumber, false)}
-              className="clay-mint-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
-            >
-              {copiedAccount ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedAccount ? 'Copied' : 'Copy'}</span>
+              <span>{copiedRef ? 'Copied' : 'Copy Ref ID'}</span>
             </button>
           </div>
         </div>
@@ -117,7 +97,7 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
               onClose();
               onPayClick(bill);
             }}
-            className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer"
+            className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
             <span>I Paid This - Upload Receipt / رسید اپلوڈ کریں</span>
           </button>
