@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #F8FAF9;
+    color: #1E293B;
+  }
+}
+
+.font-urdu {
+  font-family: 'Noto Nastaliq Urdu', 'Noto Sans Arabic', 'Urdu Typesetting', Tahoma, system-ui, sans-serif;
+  line-height: 1.8;
+}
+
+/* Eye-Soothing Soothing Mint & Soft Emerald Green Claymorphic Button */
+.clay-mint-btn {
+  background: linear-gradient(135deg, #A7F3D0 0%, #34D399 70%, #10B981 100%);
+  color: #064E3B;
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 4px rgba(5, 150, 105, 0.25),
+    0 8px 18px -3px rgba(52, 211, 153, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clay-mint-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.9),
+    inset -2px -2px 4px rgba(5, 150, 105, 0.3),
+    0 12px 24px -2px rgba(52, 211, 153, 0.45);
+}
+
+.clay-mint-btn:active {
+  transform: translateY(1px);
+  box-shadow: 
+    inset 2px 2px 3px rgba(6, 78, 59, 0.2),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.6),
+    0 4px 10px -2px rgba(52, 211, 153, 0.3);
+}
+
+/* Secondary Soothing Pill Button */
+.clay-white-btn {
+  background: #FFFFFF;
+  color: #1E293B;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.95),
+    inset -2px -2px 4px rgba(209, 250, 229, 0.6),
+    0 6px 14px -3px rgba(30, 41, 59, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clay-white-btn:hover {
+  transform: translateY(-1px);
+  background: #F0FDF4;
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 8px 18px -3px rgba(30, 41, 59, 0.12);
+}
+
+/* Frosted White Glassmorphic Card */
+.glass-green-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  box-shadow: 
+    inset 1px 1px 2px rgba(255, 255, 255, 0.95),
+    0 12px 28px -6px rgba(16, 185, 129, 0.08),
+    0 2px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+/* 48-Hour Timer Mint Badge */
+.clay-timer-badge {
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+  color: #065F46;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 
+    inset 1px 1px 2px rgba(255, 255, 255, 0.9),
+    inset -1px -1px 2px rgba(52, 211, 153, 0.2);
+}
+
+/* Clay Icon Badge */
+.clay-mint-icon {
+  background: radial-gradient(circle at 35% 35%, #D1FAE5 0%, #34D399 70%, #10B981 100%);
+  color: #FFFFFF;
+  box-shadow: 
+    inset 2px 2px 4px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 4px rgba(4, 120, 87, 0.25),
+    0 6px 14px -2px rgba(52, 211, 153, 0.4);
+}
+
+/* Soft ambient pastel green shapes */
+.ambient-glow-sage {
+  background: radial-gradient(circle, rgba(209, 250, 229, 0.7) 0%, rgba(167, 243, 208, 0.3) 50%, transparent 75%);
+}
+
+.ambient-glow-mint {
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.22) 0%, rgba(209, 250, 229, 0.15) 55%, transparent 75%);
+}
+
+/* Smooth custom pulse animation for countdown urgency */
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.timer-indicator {
+  animation: timerPulse 2s ease-in-out infinite;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ClearMyBill",
+  "description": "Global peer-to-peer bill relief platform connecting underprivileged families with direct donors to pay urgent utility, medical, and grocery bills with 100% direct-to-provider transparency.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
