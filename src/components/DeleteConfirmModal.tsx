@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, AlertTriangle, X, Loader2, ShieldCheck, KeyRound, Lock, LogIn } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { AppUser } from '../types/user';
-import { isBillOwner, hasBillSecurityPin, cleanDisplayReference } from '../services/billService';
+import { isBillOwner, hasBillSecurityPin, hasBillOwnerAccount, cleanDisplayReference } from '../services/billService';
 
 interface DeleteConfirmModalProps {
   bill: BillItem | null;
   user: AppUser | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmDelete: (billId: string) => Promise<void>;
+  onConfirmDelete: (billId: string, enteredPin?: string) => Promise<void>;
   onOpenAuth?: () => void;
 }
 
@@ -34,17 +34,24 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
   const isOwner = isBillOwner(bill, user, enteredPin);
   const isProtectedWithPin = hasBillSecurityPin(bill);
+  const isProtectedWithAccount = hasBillOwnerAccount(bill);
 
   const handleDelete = async () => {
     setPinError('');
     if (!isOwner) {
-      setPinError('Access Denied: Incorrect PIN or not logged in as the owner. / رسائی مسترد: آپ اس بل کے مالک نہیں ہیں۔');
+      if (isProtectedWithPin && enteredPin.trim().length < 4) {
+        setPinError('Please enter the 4-digit security PIN set on this bill / برائے مہربانی بل کا 4 ہندسوں کا سیکیورٹی پن درج کریں۔');
+      } else if (isProtectedWithAccount) {
+        setPinError('Access Denied: You must be logged into the creator account to delete this bill / رسائی مسترد: اس بل کو ڈیلیٹ کرنے کے لیے اصل اکاؤنٹ میں لاگ ان ہونا لازمی ہے۔');
+      } else {
+        setPinError('Access Denied: You are not authorized to delete this bill / رسائی مسترد: آپ اس بل کو ڈیلیٹ کرنے کے مجاز نہیں ہیں۔');
+      }
       return;
     }
 
     setIsDeleting(true);
     try {
-      await onConfirmDelete(bill.id);
+      await onConfirmDelete(bill.id, enteredPin.trim());
       onClose();
     } catch (err: any) {
       console.error('Delete error:', err);
@@ -79,12 +86,12 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
 
           <h3 className="text-xl font-black text-slate-900">
-            {isOwner ? 'Delete Your Bill? / بل ڈیلیٹ کریں؟' : 'Owner Verification Required / تصدیق درکار ہے'}
+            {isOwner ? 'Delete Your Bill? / بل ڈیلیٹ کریں؟' : 'Deletion Strictly Locked / ڈیلیٹ لاک ہے'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 font-urdu leading-relaxed">
             {isOwner
               ? 'کیا آپ واقعی اس بل کو ڈیٹا بیس سے مستقل ڈیلیٹ کرنا چاہتے ہیں؟'
-              : 'یہ بل محفوظ ہے۔ صرف بل کا مالک ہی اسے ڈیلیٹ کر سکتا ہے۔'}
+              : 'یہ بل 100% محفوظ ہے۔ صرف بل کا اصل مالک یا درست پن کوڈ والا شخص ہی اسے ڈیلیٹ کر سکتا ہے۔'}
           </p>
         </div>
 
@@ -111,16 +118,16 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-950 flex items-start gap-2 mb-5">
             <ShieldCheck size={16} className="text-emerald-700 shrink-0 mt-0.5" />
             <div>
-              <strong className="block">Owner Verified / آپ کی ملکیت تصدیق شدہ ہے:</strong>
+              <strong className="block text-emerald-900">Verified Owner / آپ کی ملکیت تصدیق شدہ ہے:</strong>
               This bill will be permanently removed from Supabase and will no longer appear on any device.
             </div>
           </div>
         ) : (
           <div className="space-y-3 mb-5">
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-              <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-900 flex items-start gap-2">
+              <AlertTriangle size={15} className="text-rose-600 shrink-0 mt-0.5" />
               <span>
-                To prevent random people from deleting others' bills, please verify your ownership using your account or 4-digit PIN.
+                <strong>Strict Protection Active:</strong> Anonymous deletion is completely disabled. You must verify ownership via your creator account or 4-digit PIN.
               </span>
             </div>
 
@@ -139,7 +146,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
                     setEnteredPin(e.target.value);
                     setPinError('');
                   }}
-                  placeholder="e.g. 1234"
+                  placeholder="••••"
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl text-center font-mono font-black tracking-widest text-base border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
                 />
               </div>
@@ -157,7 +164,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
                   className="text-xs text-emerald-800 hover:text-emerald-950 font-bold inline-flex items-center gap-1.5 underline cursor-pointer"
                 >
                   <LogIn size={13} />
-                  <span>Already have an account? Sign In / لاگ ان کریں</span>
+                  <span>Log In to Owner Account / اصل اکاؤنٹ میں لاگ ان کریں</span>
                 </button>
               </div>
             )}
@@ -183,12 +190,12 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
           <button
             type="button"
-            disabled={isDeleting || (!isOwner && isProtectedWithPin && enteredPin.length < 4)}
+            disabled={isDeleting || !isOwner}
             onClick={handleDelete}
-            className={`flex-1 py-3 rounded-2xl text-xs font-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 ${
+            className={`flex-1 py-3 rounded-2xl text-xs font-black transition-colors flex items-center justify-center gap-1.5 shadow-md ${
               isOwner
-                ? 'text-white bg-rose-600 hover:bg-rose-700'
-                : 'text-slate-900 bg-amber-400 hover:bg-amber-500'
+                ? 'text-white bg-rose-600 hover:bg-rose-700 cursor-pointer'
+                : 'text-slate-400 bg-slate-200 cursor-not-allowed opacity-60'
             }`}
           >
             {isDeleting ? (
@@ -196,10 +203,15 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
                 <Loader2 size={16} className="animate-spin" />
                 <span>Deleting... ڈیلیٹ ہو رہا ہے</span>
               </>
-            ) : (
+            ) : isOwner ? (
               <>
                 <Trash2 size={15} />
-                <span>{isOwner ? 'Yes, Delete / ہاں، ڈیلیٹ کریں' : 'Verify & Delete / تصدیق کر کے ڈیلیٹ کریں'}</span>
+                <span>Yes, Delete / ہاں، ڈیلیٹ کریں</span>
+              </>
+            ) : (
+              <>
+                <Lock size={14} />
+                <span>Locked / غیر مجاز</span>
               </>
             )}
           </button>

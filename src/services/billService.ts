@@ -1,7 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { BillItem, NewBillPayload } from '../types/bill';
 import { AppUser } from '../types/user';
-import { recordUploadedBillLocally, getLocallyUploadedBillIds } from './authService';
 
 export async function fetchUnpaidBills(): Promise<BillItem[]> {
   const { data, error } = await supabase
@@ -51,11 +50,6 @@ export async function insertBill(payload: NewBillPayload): Promise<BillItem> {
     throw error;
   }
 
-  // Record this bill ID locally so the uploader can immediately delete it even if they haven't made an account yet
-  if (data?.id) {
-    recordUploadedBillLocally(data.id);
-  }
-
   return data;
 }
 
@@ -93,7 +87,24 @@ export async function markBillAsPaid(
   }
 }
 
-export async function deleteBill(billId: string): Promise<void> {
+/**
+ * Strictly deletes a bill ONLY after 100% verified ownership:
+ * - Current logged-in user matches the bill creator (user ID or verified email)
+ * - OR exact matching 4-digit security PIN is provided
+ * All anonymous local device fallbacks are strictly removed.
+ */
+export async function deleteBill(
+  billId: string,
+  user?: AppUser | null,
+  enteredPin?: string,
+  targetBill?: BillItem
+): Promise<void> {
+  if (targetBill && !isBillOwner(targetBill, user || null, enteredPin)) {
+    throw new Error(
+      'Access Denied: You are not authorized to delete this bill. Only the verified owner or correct PIN can delete it. / رسائی مسترد: صرف اصل مالک یا درست پن کوڈ کے ساتھ ہی بل ڈیلیٹ کیا جا سکتا ہے۔'
+    );
+  }
+
   const { error } = await supabase
     .from('bills')
     .delete()
@@ -106,11 +117,12 @@ export async function deleteBill(billId: string): Promise<void> {
 }
 
 /**
- * Checks whether the current user is authorized to delete this bill:
- * 1. If bill has [Owner:<userId>] matching current logged-in user id.
- * 2. If bill has [User:<email>] matching current logged-in user email.
- * 3. If bill was uploaded from this specific browser/device (tracked in localStorage).
- * 4. If bill has [PIN:<4digit>] and user entered the matching PIN.
+ * Strictly checks whether the current user is authorized to delete this bill:
+ * 1. Logged-in user matches [Owner:<userId>] in reference metadata.
+ * 2. Logged-in user matches [User:<email>] in reference metadata.
+ * 3. User entered the exact matching 4-digit security PIN [PIN:<pin>].
+ *
+ * ZERO FALLBACK: Anonymous local device / localStorage deletion is strictly disallowed.
  */
 export function isBillOwner(
   bill: BillItem,
@@ -127,7 +139,7 @@ export function isBillOwner(
   }
 
   // 2. Logged in user matches [User:email]
-  if (user?.email && ref.includes(`[User:${user.email.toLowerCase()}]`)) {
+  if (user?.email && ref.includes(`[User:${user.email.toLowerCase().trim()}]`)) {
     return true;
   }
 
@@ -139,12 +151,7 @@ export function isBillOwner(
     }
   }
 
-  // 4. Device match (if uploaded on this device)
-  const localIds = getLocallyUploadedBillIds();
-  if (localIds.includes(bill.id)) {
-    return true;
-  }
-
+  // STRICT ENFORCEMENT: No anonymous local device deletion allowed
   return false;
 }
 
@@ -153,6 +160,14 @@ export function isBillOwner(
  */
 export function hasBillSecurityPin(bill: BillItem): boolean {
   return /\[PIN:\w+\]/.test(bill.reference_no || '');
+}
+
+/**
+ * Checks if the bill has a registered owner user ID or email tag
+ */
+export function hasBillOwnerAccount(bill: BillItem): boolean {
+  const ref = bill.reference_no || '';
+  return ref.includes('[Owner:') || ref.includes('[User:');
 }
 
 /**

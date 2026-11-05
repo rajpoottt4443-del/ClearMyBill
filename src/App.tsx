@@ -143,12 +143,22 @@ export default function App() {
   };
 
   // Delete bill from Supabase database (بل ڈیٹا بیس سے ڈیلیٹ کریں)
-  const handleDeleteBill = async (billId: string) => {
+  const handleDeleteBill = async (billId: string, enteredPin?: string) => {
+    const target = bills.find((b) => b.id === billId) || clearedBills.find((b) => b.id === billId);
+    if (!target) return;
+
+    if (!isBillOwner(target, user, enteredPin)) {
+      showConfirmation(
+        'Access Denied: You are not authorized to delete this bill. Only the verified owner or correct PIN can delete it. / رسائی مسترد: صرف اصل مالک یا درست پن کوڈ کے ساتھ ہی بل ڈیلیٹ کیا جا سکتا ہے۔'
+      );
+      return;
+    }
+
     // Optimistically remove from both active lists immediately
     setBills((prev) => prev.filter((b) => b.id !== billId));
     setClearedBills((prev) => prev.filter((b) => b.id !== billId));
     try {
-      await deleteBill(billId);
+      await deleteBill(billId, user, enteredPin, target);
       showConfirmation(
         'Bill deleted successfully from Supabase database! / بل کلاؤڈ ڈیٹا بیس سے کامیابی سے ڈیلیٹ کر دیا گیا ہے۔'
       );
@@ -313,6 +323,7 @@ export default function App() {
         onClose={() => setZoomedBill(null)}
         onPayClick={(bill) => setPayingBill(bill)}
         onDeleteClick={(bill) => setDeletingBill(bill)}
+        user={user}
       />
 
       {/* Receipt Upload & Auto-Delete Modal */}

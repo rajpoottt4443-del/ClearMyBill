@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Trash2 } from 'lucide-react';
 import { BillItem } from '../types/bill';
+import { AppUser } from '../types/user';
 import { BillPhotoPreview } from './BillPhotoPreview';
-import { cleanDisplayReference } from '../services/billService';
+import { cleanDisplayReference, isBillOwner, hasBillSecurityPin } from '../services/billService';
 
 interface BillZoomModalProps {
   bill: BillItem | null;
@@ -10,6 +11,7 @@ interface BillZoomModalProps {
   onClose: () => void;
   onPayClick: (bill: BillItem) => void;
   onDeleteClick?: (bill: BillItem) => void;
+  user?: AppUser | null;
 }
 
 export const BillZoomModal: React.FC<BillZoomModalProps> = ({
@@ -18,6 +20,7 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
   onClose,
   onPayClick,
   onDeleteClick,
+  user = null,
 }) => {
   const [copiedRef, setCopiedRef] = useState(false);
 
@@ -95,7 +98,7 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
         {/* Action Buttons */}
         <div className="mt-5 pt-3 border-t border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {onDeleteClick && (
+            {onDeleteClick && (isBillOwner(bill, user) || hasBillSecurityPin(bill)) && (
               <button
                 type="button"
                 onClick={() => {

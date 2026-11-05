@@ -3,7 +3,6 @@ import { AppUser } from '../types/user';
 
 const LOCAL_STORAGE_USER_KEY = 'clearmybill_user_session';
 const LOCAL_STORAGE_ACCOUNTS_KEY = 'clearmybill_registered_accounts';
-const MY_BILLS_STORAGE_KEY = 'clearmybill_my_uploaded_ids';
 
 interface StoredAccount {
   id: string;
@@ -238,27 +237,5 @@ export async function signOutUser(): Promise<void> {
     console.warn('Signout warning:', err);
   } finally {
     localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-  }
-}
-
-// Track local uploaded bills on this device so the user can manage them
-export function recordUploadedBillLocally(billId: string): void {
-  try {
-    const existing = getLocallyUploadedBillIds();
-    if (!existing.includes(billId)) {
-      existing.push(billId);
-      localStorage.setItem(MY_BILLS_STORAGE_KEY, JSON.stringify(existing));
-    }
-  } catch (e) {
-    console.error('Error saving local bill id:', e);
-  }
-}
-
-export function getLocallyUploadedBillIds(): string[] {
-  try {
-    const raw = localStorage.getItem(MY_BILLS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
   }
 }
