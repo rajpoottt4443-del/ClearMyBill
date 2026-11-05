@@ -151,16 +151,35 @@ export function hasBillOwnerAccount(bill: BillItem): boolean {
 }
 
 /**
- * Cleans the reference number for public display so internal [Owner:...], [User:...], [PIN:...],
- * or [Bank:...] tags are hidden from raw reference display, keeping the UI super clean for donors.
+ * Extracts pure clean bill reference number without any metadata or accounts
  */
-export function cleanDisplayReference(referenceNo: string): string {
+export function extractPureReferenceNumber(referenceNo: string): string {
   if (!referenceNo) return '';
   return referenceNo
     .replace(/\[Owner:[^\]]+\]/g, '')
     .replace(/\[User:[^\]]+\]/g, '')
     .replace(/\[PIN:[^\]]+\]/g, '')
     .replace(/\[Bank:[^\]]+\]/g, '')
+    .replace(/\[Paid[^\]]*\]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .trim();
+}
+
+/**
+ * Cleans the reference number for public display so internal [Owner:...], [User:...], [PIN:...],
+ * [Paid...], and inline extra text are completely hidden from the main reference field,
+ * preventing any overflowing or leaking internal tags.
+ */
+export function cleanDisplayReference(referenceNo: string): string {
+  if (!referenceNo) return '';
+  const pure = extractPureReferenceNumber(referenceNo);
+  if (pure) return pure;
+  return referenceNo
+    .replace(/\[Owner:[^\]]+\]/g, '')
+    .replace(/\[User:[^\]]+\]/g, '')
+    .replace(/\[PIN:[^\]]+\]/g, '')
+    .replace(/\[Bank:[^\]]+\]/g, '')
+    .replace(/\[Paid[^\]]*\]/g, '')
     .trim();
 }
 
@@ -171,6 +190,8 @@ export function extractBillBankAccount(
   referenceNo: string
 ): { bankName: string; accountTitle: string; accountNumber: string } | null {
   if (!referenceNo) return null;
+
+  // 1. Check structured tag [Bank:...|Title:...|Acc:...]
   const match = referenceNo.match(/\[Bank:([^|\]]+)\|Title:([^|\]]+)\|Acc:([^|\]]+)\]/);
   if (match) {
     return {
@@ -179,5 +200,25 @@ export function extractBillBankAccount(
       accountNumber: match[3].trim(),
     };
   }
+
+  // 2. Check legacy inline tag (Name: ... | Acc: ...)
+  const legacyMatch = referenceNo.match(/\(Name:\s*([^|)]+)\s*\|\s*Acc:\s*([^)]+)\)/);
+  if (legacyMatch) {
+    const rawAcc = legacyMatch[2].trim();
+    let bank = 'Direct Account';
+    let num = rawAcc;
+    if (rawAcc.includes(':')) {
+      const parts = rawAcc.split(':');
+      bank = parts[0].trim();
+      num = parts.slice(1).join(':').trim();
+    }
+    return {
+      bankName: bank,
+      accountTitle: legacyMatch[1].trim(),
+      accountNumber: num,
+    };
+  }
+
   return null;
 }
+

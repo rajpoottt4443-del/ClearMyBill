@@ -24,6 +24,7 @@ import {
   getUserBankAccounts,
   encodeBankAccountInReference,
 } from '../services/bankAccountService';
+import { verifyBillDocument } from '../services/receiptVerificationService';
 
 interface SimpleUploadBoxProps {
   onBillSubmitted: (payload: NewBillPayload) => Promise<void>;
@@ -218,6 +219,18 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({
     setIsSubmitting(true);
     setErrorMsg('');
     try {
+      // 1. Verify bill document authenticity (ensure not blank, not a random meme/selfie)
+      const verification = await verifyBillDocument(billPhotoData, cleanAmount, finalBillType);
+      if (!verification.isValid) {
+        setIsSubmitting(false);
+        setErrorMsg(
+          verification.reason ||
+            'Verification Failed: Invalid or unreadable bill image. Please upload a clear photo of an authentic bill. / جعلی یا نامکمل بل کی تصویر مسترد: برائے مہربانی بل کی اصل تصویر اپلوڈ کریں۔'
+        );
+        return;
+      }
+
+      // 2. Verified authentic bill: proceed to save into Supabase
       await onBillSubmitted(payload);
       // Reset form on success
       setReferenceNo('');
