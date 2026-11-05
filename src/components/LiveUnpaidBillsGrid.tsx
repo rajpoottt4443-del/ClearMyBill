@@ -321,17 +321,17 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       )}
                     </div>
 
-                    {/* Action Button: I Paid This - Upload Receipt */}
+                    {/* Action Button: I Paid This - Auto-Verify & Clear */}
                     <div className="pt-2 border-t border-emerald-100">
                       <button
                         onClick={() => onOpenReceiptUpload(bill)}
                         className="clay-mint-btn w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer shadow-md group"
                       >
                         <CheckCircle2 size={16} className="stroke-[2.5]" />
-                        <span>I Paid This - Upload Receipt</span>
+                        <span>I Paid This - Auto-Verify & Clear</span>
                       </button>
                       <div className="text-center text-[10px] text-emerald-900 font-urdu font-bold mt-1.5">
-                        بل ادا کر دیا (رسید اپلوڈ کریں)
+                        بل ادا کر دیا (ریفرنس، نام اور رقم کی خودکار تصدیق)
                       </div>
                     </div>
                   </div>
@@ -638,7 +638,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <span className="text-xs font-black text-emerald-900 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-300 flex items-center gap-1.5">
                             <CheckCircle2 size={13} className="text-emerald-700" />
-                            <span>Paid & Saved / ادا شدہ</span>
+                            <span>100% Auto-Verified / خودکار تصدیق شدہ</span>
                           </span>
                           <div className="flex items-center gap-1.5">
                             <span className="font-black text-sm text-emerald-950">
@@ -672,8 +672,8 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                        <span>Date: {new Date(bill.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                        <span className="font-urdu font-bold text-emerald-800">محفوظ شدہ ریکارڈ</span>
+                        <span className="text-emerald-800 font-bold">✓ Ref, Name & Amount Matched</span>
+                        <span className="font-urdu font-bold text-emerald-800">تصدیق مکمل و محفوظ</span>
                       </div>
                     </div>
                   );

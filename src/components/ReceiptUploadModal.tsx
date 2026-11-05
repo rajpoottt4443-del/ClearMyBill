@@ -11,6 +11,9 @@ import {
   Building2,
   Loader2,
   Trash2,
+  User,
+  Hash,
+  Coins,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BillItem } from '../types/bill';
@@ -18,8 +21,12 @@ import {
   cleanDisplayReference,
   extractBillBankAccount,
   extractPureReferenceNumber,
+  extractBillBeneficiaryName,
 } from '../services/billService';
-import { verifyPaymentReceipt } from '../services/receiptVerificationService';
+import {
+  verifyPaymentReceipt,
+  VerificationResult,
+} from '../services/receiptVerificationService';
 
 interface ReceiptUploadModalProps {
   bill: BillItem | null;
@@ -39,7 +46,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
   const [donorName, setDonorName] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [verificationSuccess, setVerificationSuccess] = useState<string>('');
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [copiedField, setCopiedField] = useState<string>('');
 
@@ -47,6 +54,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
 
   const pureRef = extractPureReferenceNumber(bill.reference_no) || cleanDisplayReference(bill.reference_no);
   const attachedBank = extractBillBankAccount(bill.reference_no);
+  const beneficiaryName = extractBillBeneficiaryName(bill.reference_no);
 
   const handleCopy = (text: string, fieldKey: string) => {
     navigator.clipboard.writeText(text);
@@ -59,7 +67,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
     if (file) {
       setFileName(file.name);
       setErrorMsg('');
-      setVerificationSuccess('');
+      setVerificationResult(null);
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === 'string') {
@@ -74,7 +82,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
     setReceiptImage('');
     setFileName('');
     setErrorMsg('');
-    setVerificationSuccess('');
+    setVerificationResult(null);
   };
 
   const handleConfirmReceipt = async (e: React.FormEvent) => {
@@ -85,38 +93,44 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
     }
 
     setErrorMsg('');
-    setVerificationSuccess('');
+    setVerificationResult(null);
     setIsVerifying(true);
 
     try {
-      // Rigorous verification: check for authentic transaction receipt, TID, and provider
+      const cleanBillAmount =
+        typeof bill.amount === 'number'
+          ? bill.amount
+          : parseFloat(String(bill.amount).replace(/[^0-9.]/g, '')) || 0;
+
+      // Auto-verification: checks 1. Reference ID, 2. Beneficiary Name, 3. Amount against receipt
       const verification = await verifyPaymentReceipt(
         receiptImage,
-        typeof bill.amount === 'number' ? bill.amount : parseFloat(String(bill.amount)),
-        pureRef
+        cleanBillAmount,
+        pureRef,
+        beneficiaryName,
+        attachedBank?.accountNumber
       );
+
+      setVerificationResult(verification);
 
       if (!verification.isValid) {
         setIsVerifying(false);
         setErrorMsg(
           verification.reason ||
-            'Fake or invalid receipt detected. Please upload an authentic payment screenshot with Transaction ID. / جعلی یا نامکمل رسید مسترد: برائے مہربانی درست ٹرانزیکشن رسید اپلوڈ کریں۔'
+            'Auto-Verification Failed: Reference ID, Name, or Amount does not match the bill. Please upload the correct payment receipt. / خودکار تصدیق مسترد: ریفرنس آئی ڈی، نام یا رقم بل سے مطابقت نہیں رکھتی۔'
         );
         return;
       }
 
       // Verification passed!
-      setVerificationSuccess(
-        `✓ ${verification.reason || 'Verified authentic payment receipt'} (${verification.detectedProvider || 'Receipt Confirmed'})`
-      );
       setIsVerifying(false);
       setIsSubmitting(true);
 
       // Multi-stage confetti celebration
       try {
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 90,
+          spread: 75,
           origin: { y: 0.6 },
           colors: ['#059669', '#34D399', '#A7F3D0', '#10B981', '#064E3B'],
         });
@@ -160,24 +174,32 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             <CheckCircle2 size={30} className="stroke-[2.5]" />
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-black">
-            Upload Payment Receipt / رسید اپلوڈ کریں
+            Auto-Verification & Payment Receipt
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 font-urdu">
-            ادائیگی کی درست رسید اپلوڈ کریں۔ ہر رسید کو محفوظ کرنے سے پہلے سخت تصدیق سے گزارا جاتا ہے۔
+          <div className="text-xs sm:text-sm text-emerald-900 font-black font-urdu mt-0.5">
+            خودکار تصدیق: ریفرنس آئی ڈی، نام اور رقم کی لازمی جانچ
+          </div>
+          <p className="text-[11px] text-slate-600 mt-1 font-urdu leading-relaxed">
+            سسٹم رسید کا خودکار معائنہ کر کے بل کی رقم، نام اور ریفرنس کی تصدیق کرے گا۔ ایک بار تصدیق ہونے پر یہ بل مستقل محفوظ ہو جائے گا۔
           </p>
         </div>
 
-        {/* Clean Bill Summary (No raw metadata tags leaking!) */}
-        <div className="bg-white/95 p-4 rounded-2xl border border-emerald-200 mb-5 space-y-2.5 text-xs">
-          <div className="flex justify-between items-center text-slate-500">
-            <span>Bill Category / بل کی قسم:</span>
-            <span className="font-bold text-slate-900">{bill.bill_type}</span>
+        {/* 3-Point Auto-Verification Targets Card */}
+        <div className="bg-white/95 p-4 rounded-2xl border border-emerald-200 mb-4 space-y-2.5 text-xs shadow-xs">
+          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800 border-b border-emerald-100 pb-1.5 flex items-center justify-between">
+            <span>Bill Verification Criteria / تصدیقی شرائط:</span>
+            <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+              3-Point Auto Check
+            </span>
           </div>
 
-          {/* Clean Bill Reference with Copy Button */}
-          <div className="flex justify-between items-center text-slate-500 gap-2">
-            <span className="shrink-0">Bill Reference / ریفرنس نمبر:</span>
-            <div className="flex items-center gap-1.5 max-w-[65%]">
+          {/* 1. Reference ID */}
+          <div className="flex justify-between items-center text-slate-700 gap-2">
+            <span className="flex items-center gap-1.5 text-slate-500 font-bold shrink-0">
+              <Hash size={13} className="text-emerald-700" />
+              <span>1. Reference ID / ریفرنس نمبر:</span>
+            </span>
+            <div className="flex items-center gap-1.5 max-w-[60%]">
               <span className="font-mono font-bold text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 truncate">
                 {pureRef || 'N/A'}
               </span>
@@ -195,9 +217,33 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             </div>
           </div>
 
-          {/* Clean Attached Bank Details (if present) */}
+          {/* 2. Beneficiary / Consumer Name */}
+          <div className="flex justify-between items-center text-slate-700 gap-2">
+            <span className="flex items-center gap-1.5 text-slate-500 font-bold shrink-0">
+              <User size={13} className="text-emerald-700" />
+              <span>2. Recipient Name / حقدار کا نام:</span>
+            </span>
+            <span className="font-bold text-slate-900 truncate">
+              {beneficiaryName || attachedBank?.accountTitle || 'Beneficiary / صارف'}
+            </span>
+          </div>
+
+          {/* 3. Amount */}
+          <div className="flex justify-between items-center text-slate-700 gap-2 pt-1 border-t border-slate-100">
+            <span className="flex items-center gap-1.5 text-slate-500 font-bold shrink-0">
+              <Coins size={13} className="text-emerald-700" />
+              <span>3. Bill Amount / بل کی رقم:</span>
+            </span>
+            <span className="text-emerald-700 font-black text-sm">
+              {typeof bill.amount === 'number'
+                ? `Rs. ${bill.amount.toLocaleString()}`
+                : `Rs. ${bill.amount}`}
+            </span>
+          </div>
+
+          {/* Attached Bank Details (if present) */}
           {attachedBank && (
-            <div className="p-2.5 bg-emerald-50/80 rounded-xl border border-emerald-200 space-y-1">
+            <div className="p-2 bg-emerald-50/80 rounded-xl border border-emerald-200 mt-2 space-y-1">
               <div className="flex items-center justify-between text-emerald-900 font-bold text-[11px]">
                 <span className="flex items-center gap-1">
                   <Building2 size={12} className="text-emerald-700" />
@@ -220,33 +266,85 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
               </div>
             </div>
           )}
-
-          <div className="flex justify-between items-center text-slate-800 font-bold border-t border-slate-100 pt-2 text-sm">
-            <span>Amount Paid / ادا شدہ رقم:</span>
-            <span className="text-emerald-700 font-black">
-              {typeof bill.amount === 'number'
-                ? `Rs. ${bill.amount.toLocaleString()}`
-                : `Rs. ${bill.amount}`}
-            </span>
-          </div>
         </div>
 
-        {/* Error Alert */}
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-start gap-2 shadow-2xs">
-            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
-            <div className="leading-snug">
-              <strong>Verification Rejected / رسید مسترد:</strong>
-              <div className="mt-0.5 font-urdu">{errorMsg}</div>
+        {/* Live Auto-Verification Breakdown Result */}
+        {verificationResult && (
+          <div
+            className={`mb-4 p-3.5 rounded-2xl border text-xs ${
+              verificationResult.isValid
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                : 'bg-rose-50 border-rose-300 text-rose-950'
+            }`}
+          >
+            <div className="font-black flex items-center gap-1.5 mb-2 text-sm">
+              {verificationResult.isValid ? (
+                <>
+                  <CheckCircle2 size={17} className="text-emerald-700" />
+                  <span>Auto-Verification Passed! / خودکار تصدیق کامیاب</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle size={17} className="text-rose-600" />
+                  <span>Auto-Verification Failed / تصدیق مسترد</span>
+                </>
+              )}
             </div>
+
+            {/* 3 Criteria Match Status Badges */}
+            <div className="grid grid-cols-3 gap-2 my-2 text-[11px] font-bold">
+              <div
+                className={`p-2 rounded-xl text-center border ${
+                  verificationResult.refMatched
+                    ? 'bg-white text-emerald-800 border-emerald-200'
+                    : 'bg-rose-100 text-rose-900 border-rose-200'
+                }`}
+              >
+                <div>Ref ID</div>
+                <div>{verificationResult.refMatched ? '✓ Matched' : '❌ Mismatch'}</div>
+              </div>
+              <div
+                className={`p-2 rounded-xl text-center border ${
+                  verificationResult.nameMatched
+                    ? 'bg-white text-emerald-800 border-emerald-200'
+                    : 'bg-rose-100 text-rose-900 border-rose-200'
+                }`}
+              >
+                <div>Name</div>
+                <div>{verificationResult.nameMatched ? '✓ Matched' : '❌ Mismatch'}</div>
+              </div>
+              <div
+                className={`p-2 rounded-xl text-center border ${
+                  verificationResult.amountMatched
+                    ? 'bg-white text-emerald-800 border-emerald-200'
+                    : 'bg-rose-100 text-rose-900 border-rose-200'
+                }`}
+              >
+                <div>Amount</div>
+                <div>{verificationResult.amountMatched ? '✓ Matched' : '❌ Mismatch'}</div>
+              </div>
+            </div>
+
+            <div className="mt-1 leading-relaxed font-urdu text-[11px]">
+              {verificationResult.reason}
+            </div>
+
+            {verificationResult.detectedProvider && (
+              <div className="text-[10px] text-slate-600 font-mono mt-1">
+                Provider: {verificationResult.detectedProvider} {verificationResult.detectedTid ? `| TID: ${verificationResult.detectedTid}` : ''}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Verification Success Alert */}
-        {verificationSuccess && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
-            <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
-            <div className="font-bold">{verificationSuccess}</div>
+        {/* Generic Error message */}
+        {errorMsg && !verificationResult && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-start gap-2 shadow-2xs">
+            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+            <div className="leading-snug">
+              <strong>Error / خرابی:</strong>
+              <div className="mt-0.5 font-urdu">{errorMsg}</div>
+            </div>
           </div>
         )}
 
@@ -313,16 +411,13 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             />
           </div>
 
-          {/* Verification & Anti-Fake Guard Notice */}
+          {/* Lock Notice: Once verified, verification option disappears */}
           <div className="p-3 bg-emerald-50/90 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
             <ShieldCheck size={16} className="text-emerald-700 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
-              <strong>100% Anti-Fake Verification / مکمل تصدیق شدہ رسید:</strong>
+              <strong>Permanent Auto-Verification Lock / مستقل تصدیق شدہ ریکارڈ:</strong>
               <div>
-                Each receipt is verified for authenticity before saving. Fake or blank screenshots are immediately rejected.
-              </div>
-              <div className="font-urdu text-[11px] text-emerald-950 mt-0.5">
-                جعلی یا غلط تصویر قطعی محفوظ نہیں ہوگی۔ صرف تصدیق شدہ رسید ہی قبول کی جائے گی۔
+                ایک بار ریفرنس نمبر، نام اور رقم کی خودکار تصدیق ہو جائے تو یہ بل فوری طور پر کلیئر ہو جائے گا اور دوبارہ تصدیق کا آپشن ختم ہو جائے گا۔
               </div>
             </div>
           </div>
@@ -337,17 +432,17 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
               {isVerifying ? (
                 <div className="flex items-center gap-2">
                   <Loader2 size={18} className="animate-spin text-emerald-900" />
-                  <span>Verifying Receipt Authenticity... رسید کی تصدیق جاری ہے</span>
+                  <span>Auto-Verifying Ref, Name & Amount... خودکار تصدیق جاری ہے</span>
                 </div>
               ) : isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <Loader2 size={18} className="animate-spin text-emerald-900" />
-                  <span>Saving Paid Record... ریکارڈ محفوظ ہو رہا ہے</span>
+                  <span>Verified! Locking Record... محفوظ کیا جا رہا ہے</span>
                 </div>
               ) : (
                 <>
                   <Sparkles size={18} />
-                  <span>Verify Receipt & Save to Paid Bills / تصدیق اور ادا شدہ محفوظ کریں</span>
+                  <span>Auto-Verify & Confirm Receipt / خودکار تصدیق اور محفوظ کریں</span>
                 </>
               )}
             </button>

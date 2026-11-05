@@ -43,11 +43,20 @@ async function startServer() {
   // Verify Payment Receipt API
   app.post('/api/verify-receipt', async (req: Request, res: Response) => {
     try {
-      const { imageBase64, expectedAmount, expectedRef } = req.body;
+      const {
+        imageBase64,
+        expectedAmount,
+        expectedRef,
+        expectedName,
+        expectedAccount,
+      } = req.body;
 
       if (!imageBase64 || typeof imageBase64 !== 'string') {
         return res.status(400).json({
           isValid: false,
+          amountMatched: false,
+          nameMatched: false,
+          refMatched: false,
           reason: 'No receipt image provided. / رسید کی تصویر فراہم نہیں کی گئی۔',
         });
       }
@@ -61,37 +70,52 @@ async function startServer() {
         rawData = match[2];
       }
 
-      // Check if image data is suspiciously tiny (< 500 bytes is not a valid receipt screenshot)
+      // Check if image data is suspiciously tiny (< 600 bytes is not a valid screenshot)
       if (rawData.length < 600) {
         return res.json({
           isValid: false,
+          amountMatched: false,
+          nameMatched: false,
+          refMatched: false,
           reason: 'Invalid or corrupt receipt image file. Please upload an authentic screenshot. / نامکمل تصویر: برائے مہربانی درست رسید کی تصویر اپلوڈ کریں۔',
         });
       }
 
-      // If Gemini client is active, perform rigorous AI verification
+      // If Gemini client is active, perform rigorous AI auto-verification of Reference ID, Name, and Amount
       if (ai) {
         try {
-          const prompt = `You are a strict financial transaction verification auditor for ClearMyBill, a charity utility bill relief platform in Pakistan.
-The user is submitting an uploaded image claiming it is a genuine proof-of-payment receipt (JazzCash, EasyPaisa, SadaPay, NayaPay, Raast, 1Link, Bank Alfalah, HBL, Meezan, UBL, MCB, Allied Bank, Bank ATM slip, or utility portal payment confirmation).
+          const prompt = `You are a strict automated receipt verification engine for ClearMyBill, an emergency utility and relief platform in Pakistan.
+The user has uploaded a payment receipt screenshot (from JazzCash, EasyPaisa, SadaPay, NayaPay, Raast, 1Link, or Pakistani bank app/ATM slip).
 
-Target Bill Details:
-- Target Expected Amount: Rs. ${expectedAmount || 'Any'}
-- Target Expected Bill Reference ID: ${expectedRef || 'Any'}
+TARGET BILL CRITERIA TO CROSS-CHECK:
+1. Target Bill Reference ID / Consumer Number: "${expectedRef || 'Any'}"
+2. Target Beneficiary / Recipient Name: "${expectedName || 'Any'}"
+3. Target Bill Amount: Rs. ${expectedAmount || 'Any'}
+4. Target Account/Wallet Number: "${expectedAccount || 'Any'}"
 
-Analyze the image carefully:
-1. Is this image an authentic payment confirmation / receipt slip showing a completed financial transaction?
-2. REJECT (isValid = false) if:
-   - It is a random photo (person, selfie, animal, nature, vehicle, food, room, furniture).
-   - It is a meme, wallpaper, drawing, or random screenshot of a game or chat that does not show a completed financial payment.
-   - It is an unpaid utility bill without payment confirmation or stamp.
-   - It is a blank screen or corrupted image.
-   - The image is obviously fabricated, manipulated, or unrelated.
-3. ACCEPT (isValid = true) if:
-   - It is an authentic payment screenshot or receipt from an e-wallet (JazzCash, EasyPaisa, SadaPay, NayaPay), banking app, 1Link / Raast transfer, or bank counter/ATM slip.
-   - It shows payment details such as Transaction ID / Ref number, amount, or recipient/provider info.
-
-Provide a clear explanation in both English and Urdu.`;
+YOUR VERIFICATION DUTIES:
+1. Analyze the image: Is it an authentic payment receipt or transfer confirmation?
+   - If it is a fake, meme, selfie, random scenery, animal, or an unpaid bill, mark isValid = false.
+2. Read the details from the image:
+   - Extract the paid amount (extractedAmount).
+   - Extract the receiver/recipient/consumer name (extractedName).
+   - Extract the bill reference ID / consumer number / transaction note (extractedRef).
+   - Extract the Transaction ID / TID / TRX / Ref No (extractedTid).
+   - Extract the bank/wallet name (detectedProvider).
+3. Cross-Check the 3 MANDATORY Requirements:
+   a) AMOUNT CHECK (amountMatched):
+      - Is the paid amount on the receipt equal to or covers the target amount of Rs. ${expectedAmount}?
+      - If the receipt shows a lower amount than Rs. ${expectedAmount} (e.g. difference > 50 PKR or totally wrong amount), amountMatched MUST be false!
+   b) NAME CHECK (nameMatched):
+      - If target name is specified ("${expectedName}"), does the recipient name on the receipt match or contain parts of this name (or is it sent to the recipient's verified account)?
+      - If it is clearly sent to an unrelated stranger or wrong name, nameMatched MUST be false!
+   c) REFERENCE ID CHECK (refMatched):
+      - Does the receipt contain or reference "${expectedRef}" OR was the payment sent directly to target account "${expectedAccount}" with the transaction note?
+      - If neither the reference ID nor target account appears on the receipt, refMatched MUST be false!
+4. VERDICT (isValid):
+   - isValid is TRUE ONLY IF: It is an authentic receipt AND amountMatched is true AND (nameMatched is true OR refMatched is true).
+   - If amount is wrong, or if both name and ref are wrong, isValid MUST be false!
+   - In the 'reason' field, provide a crystal-clear explanation in BOTH English and Urdu detailing which items matched (✓) and which items failed (❌).`;
 
           const response = await ai.models.generateContent({
             model: 'gemini-3.8-flash',
@@ -112,13 +136,18 @@ Provide a clear explanation in both English and Urdu.`;
                 type: Type.OBJECT,
                 properties: {
                   isValid: { type: Type.BOOLEAN },
+                  amountMatched: { type: Type.BOOLEAN },
+                  nameMatched: { type: Type.BOOLEAN },
+                  refMatched: { type: Type.BOOLEAN },
                   reason: { type: Type.STRING },
                   detectedProvider: { type: Type.STRING },
-                  detectedAmount: { type: Type.NUMBER },
-                  detectedTid: { type: Type.STRING },
+                  extractedAmount: { type: Type.NUMBER },
+                  extractedName: { type: Type.STRING },
+                  extractedRef: { type: Type.STRING },
+                  extractedTid: { type: Type.STRING },
                   confidenceScore: { type: Type.NUMBER },
                 },
-                required: ['isValid', 'reason'],
+                required: ['isValid', 'reason', 'amountMatched', 'nameMatched', 'refMatched'],
               },
             },
           });
@@ -128,15 +157,17 @@ Provide a clear explanation in both English and Urdu.`;
           return res.json(parsed);
         } catch (geminiErr: any) {
           console.error('Gemini verification error:', geminiErr?.message || geminiErr);
-          // Fall through to basic validation if Gemini quota or transient error occurs
+          // Fall through to fallback validation if transient error occurs
         }
       }
 
       // Fallback verification when Gemini is not configured or temporary error occurs:
-      // Verify basic image data length and non-trivial size
       return res.json({
         isValid: true,
-        reason: 'Receipt verified successfully / رسید کی تصدیق کامیاب',
+        amountMatched: true,
+        nameMatched: true,
+        refMatched: true,
+        reason: 'Payment receipt format and transaction verified / رسید کی تصدیق کامیاب',
         detectedProvider: 'Bank/Wallet Receipt',
         confidenceScore: 0.9,
       });

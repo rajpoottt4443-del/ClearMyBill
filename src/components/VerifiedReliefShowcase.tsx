@@ -78,7 +78,7 @@ export const VerifiedReliefShowcase: React.FC<VerifiedReliefShowcaseProps> = ({
                   <div className="flex items-center justify-between gap-1.5 mb-2.5">
                     <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
                       <CheckCircle2 size={12} className="text-emerald-700" />
-                      <span>PAID & CLEARED</span>
+                      <span>AUTO-VERIFIED & PAID</span>
                     </span>
                     <span className="text-xs font-black text-emerald-900">
                       Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}

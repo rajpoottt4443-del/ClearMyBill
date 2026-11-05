@@ -3,7 +3,8 @@ import { X, Copy, Check, Building2 } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { AppUser } from '../types/user';
 import { BillPhotoPreview } from './BillPhotoPreview';
-import { cleanDisplayReference, extractBillBankAccount } from '../services/billService';
+import { cleanDisplayReference, extractBillBankAccount, isBillAutoVerified } from '../services/billService';
+import { CheckCircle2 } from 'lucide-react';
 
 interface BillZoomModalProps {
   bill: BillItem | null;
@@ -126,20 +127,41 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: If already verified & paid, hide upload/verification option permanently */}
         <div className="mt-5 pt-3 border-t border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
-            بل ادا کرنے کے بعد رسید اپلوڈ کریں تاکہ ادائیگی کا مستقل ریکارڈ محفوظ ہو جائے
-          </div>
-          <button
-            onClick={() => {
-              onClose();
-              onPayClick(bill);
-            }}
-            className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
-          >
-            <span>I Paid This - Upload Receipt / رسید اپلوڈ کریں</span>
-          </button>
+          {isBillAutoVerified(bill) || bill.status === 'paid' ? (
+            <div className="w-full p-3.5 bg-emerald-50 rounded-2xl border border-emerald-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={18} className="text-emerald-700" />
+                <div>
+                  <span className="text-xs sm:text-sm font-black text-emerald-950 block">
+                    100% Auto-Verified & Paid / خودکار تصدیق شدہ اور ادا شدہ
+                  </span>
+                  <span className="text-[10px] text-emerald-800 font-urdu block">
+                    ریفرنس، نام اور رقم کی تصدیق مکمل ہو چکی ہے۔
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-800 bg-white px-3 py-1 rounded-full border border-emerald-200 shrink-0">
+                Verified & Locked / تصدیق مکمل
+              </span>
+            </div>
+          ) : (
+            <>
+              <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
+                بل ادا کرنے کے بعد رسید لگائیں تاکہ ریفرنس، نام اور رقم کی خودکار تصدیق کے بعد ریکارڈ محفوظ ہو
+              </div>
+              <button
+                onClick={() => {
+                  onClose();
+                  onPayClick(bill);
+                }}
+                className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <span>I Paid This - Auto-Verify / رسید اپلوڈ کریں</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

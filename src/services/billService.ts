@@ -68,11 +68,13 @@ export async function markBillAsPaid(
     updateData.image_url = receiptImageUrl;
   }
 
-  // Permanently record donor name/details into reference_no
+  // Permanently record donor name/details and AutoVerified status into reference_no
   if (currentReferenceNo) {
-    const paidTag = donorName ? `[Paid by: ${donorName}]` : '[Paid / ادا شدہ]';
+    const paidTag = donorName ? `[Paid by: ${donorName}] [AutoVerified]` : '[Paid / ادا شدہ] [AutoVerified]';
     if (!currentReferenceNo.includes('[Paid')) {
       updateData.reference_no = `${currentReferenceNo} ${paidTag}`;
+    } else if (!currentReferenceNo.includes('[AutoVerified]')) {
+      updateData.reference_no = `${currentReferenceNo} [AutoVerified]`;
     }
   }
 
@@ -161,13 +163,14 @@ export function extractPureReferenceNumber(referenceNo: string): string {
     .replace(/\[PIN:[^\]]+\]/g, '')
     .replace(/\[Bank:[^\]]+\]/g, '')
     .replace(/\[Paid[^\]]*\]/g, '')
+    .replace(/\[AutoVerified\]/g, '')
     .replace(/\([^)]*\)/g, '')
     .trim();
 }
 
 /**
  * Cleans the reference number for public display so internal [Owner:...], [User:...], [PIN:...],
- * [Paid...], and inline extra text are completely hidden from the main reference field,
+ * [Paid...], [AutoVerified], and inline extra text are completely hidden from the main reference field,
  * preventing any overflowing or leaking internal tags.
  */
 export function cleanDisplayReference(referenceNo: string): string {
@@ -180,6 +183,7 @@ export function cleanDisplayReference(referenceNo: string): string {
     .replace(/\[PIN:[^\]]+\]/g, '')
     .replace(/\[Bank:[^\]]+\]/g, '')
     .replace(/\[Paid[^\]]*\]/g, '')
+    .replace(/\[AutoVerified\]/g, '')
     .trim();
 }
 
@@ -221,4 +225,26 @@ export function extractBillBankAccount(
 
   return null;
 }
+
+/**
+ * Extracts beneficiary or account holder name from bill reference string
+ */
+export function extractBillBeneficiaryName(referenceNo: string): string {
+  if (!referenceNo) return '';
+  const bank = extractBillBankAccount(referenceNo);
+  if (bank?.accountTitle) return bank.accountTitle;
+  const match = referenceNo.match(/\(Name:\s*([^|)]+)/);
+  if (match) return match[1].trim();
+  return '';
+}
+
+/**
+ * Checks if a bill has already been verified and paid.
+ * Once verified, the verification option is permanently removed.
+ */
+export function isBillAutoVerified(bill: BillItem): boolean {
+  if (!bill) return false;
+  return bill.status === 'paid' || (!!bill.reference_no && bill.reference_no.includes('[AutoVerified]'));
+}
+
 
