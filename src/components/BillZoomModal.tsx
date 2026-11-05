@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, Copy, Check } from 'lucide-react';
+import { X, Copy, Check, Trash2 } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { BillPhotoPreview } from './BillPhotoPreview';
+import { cleanDisplayReference } from '../services/billService';
 
 interface BillZoomModalProps {
   bill: BillItem | null;
   isOpen: boolean;
   onClose: () => void;
   onPayClick: (bill: BillItem) => void;
+  onDeleteClick?: (bill: BillItem) => void;
 }
 
 export const BillZoomModal: React.FC<BillZoomModalProps> = ({
@@ -15,13 +17,16 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
   isOpen,
   onClose,
   onPayClick,
+  onDeleteClick,
 }) => {
   const [copiedRef, setCopiedRef] = useState(false);
 
   if (!isOpen || !bill) return null;
 
+  const displayRef = cleanDisplayReference(bill.reference_no);
+
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(cleanDisplayReference(text));
     setCopiedRef(true);
     setTimeout(() => setCopiedRef(false), 2000);
   };
@@ -59,7 +64,7 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
         <div className="my-4">
           <BillPhotoPreview
             photoKey={bill.image_url}
-            referenceId={bill.reference_no}
+            referenceId={displayRef}
             amount={bill.amount}
             billType={bill.bill_type}
             className="w-full"
@@ -74,7 +79,7 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
                 Bill Reference ID / بل کا ریفرنس نمبر
               </span>
               <span className="font-mono font-bold text-sm text-slate-900 truncate block">
-                {bill.reference_no}
+                {displayRef}
               </span>
             </div>
             <button
@@ -87,10 +92,26 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         <div className="mt-5 pt-3 border-t border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
-            بل ادا کرنے کے بعد رسید اپلوڈ کریں تاکہ بل فوراً ہٹ جائے
+          <div className="flex items-center gap-2">
+            {onDeleteClick && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onDeleteClick(bill);
+                }}
+                className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                title="Delete this bill / بل ڈیلیٹ کریں"
+              >
+                <Trash2 size={14} />
+                <span>Delete Bill / بل ڈیلیٹ کریں</span>
+              </button>
+            )}
+            <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
+              بل ادا کرنے کے بعد رسید اپلوڈ کریں تاکہ بل فوراً ہٹ جائے
+            </div>
           </div>
           <button
             onClick={() => {

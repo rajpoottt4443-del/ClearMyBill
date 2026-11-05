@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { UploadCloud, CheckCircle2, Clock, Image as ImageIcon, AlertCircle, X, Loader2 } from 'lucide-react';
+import { UploadCloud, CheckCircle2, Clock, AlertCircle, X, Loader2, ShieldCheck, UserCheck, LogIn, UserPlus, Lock } from 'lucide-react';
 import { NewBillPayload } from '../types/bill';
+import { AppUser } from '../types/user';
 import { compressImage } from '../lib/imageUtils';
 
 interface SimpleUploadBoxProps {
   onBillSubmitted: (payload: NewBillPayload) => Promise<void>;
+  user?: AppUser | null;
+  onOpenAuth?: (mode?: 'login' | 'signup') => void;
 }
 
-export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitted }) => {
+export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({
+  onBillSubmitted,
+  user,
+  onOpenAuth,
+}) => {
   const [billType, setBillType] = useState<string>('Electricity Bill / بجلی کا بل');
   const [referenceNo, setReferenceNo] = useState<string>('');
   const [personName, setPersonName] = useState<string>('');
@@ -20,6 +27,12 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitte
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Strict Gate: Nobody can upload without account
+    if (!user) {
+      if (onOpenAuth) onOpenAuth('signup');
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (file) {
       setUploadedFileName(file.name);
@@ -44,6 +57,13 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitte
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Strict Gate: Nobody can submit without account
+    if (!user) {
+      if (onOpenAuth) onOpenAuth('signup');
+      return;
+    }
+
     if (!billPhotoData) {
       setErrorMsg('Please upload a photo of your bill / براہ کرم بل کی تصویر لگائیں');
       return;
@@ -58,7 +78,7 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitte
       return;
     }
 
-    // Combine reference_no with optional account or person info if entered
+    // Combine reference_no with optional account or person info
     let combinedReference = referenceNo.trim();
     const extraDetails: string[] = [];
     if (personName.trim()) extraDetails.push(`Name: ${personName.trim()}`);
@@ -66,6 +86,9 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitte
     if (extraDetails.length > 0) {
       combinedReference = `${combinedReference} (${extraDetails.join(' | ')})`;
     }
+
+    // Strictly tag with logged-in user id and email so only they can delete it
+    combinedReference = `${combinedReference} [Owner:${user.id}] [User:${user.email.toLowerCase()}]`;
 
     const payload: NewBillPayload = {
       bill_type: billType,
@@ -120,206 +143,285 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({ onBillSubmitte
           </span>
         </div>
 
-        {/* Form Title */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-emerald-100 pb-3">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-              Upload Your Bill / بل اپلوڈ کریں
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-              Saved instantly in Supabase database & visible to donors worldwide.
+        {/* ========================================================
+            CASE 1: USER IS NOT LOGGED IN (ACCOUNT REQUIRED GATE)
+            Nobody can upload without creating an account first!
+           ======================================================== */}
+        {!user ? (
+          <div className="py-6 px-4 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <Lock size={32} className="stroke-[2.2]" />
+            </div>
+
+            <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight mb-2">
+              Account Required to Upload Bill / <span className="font-urdu font-black text-emerald-950">پہلے اکاؤنٹ بنائیں</span>
+            </h3>
+
+            <p className="text-sm sm:text-base text-slate-700 max-w-lg mx-auto font-medium">
+              To keep bills safe and ensure that <strong>only you have the power to delete or manage your bill</strong>, you must create a free account before uploading.
             </p>
-          </div>
-          <span className="text-xs font-urdu font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
-            آسان طریقہ
-          </span>
-        </div>
 
-        {errorMsg && (
-          <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+            <p className="text-xs sm:text-sm text-emerald-900 font-urdu font-bold mt-2 max-w-md mx-auto leading-relaxed">
+              بل اپلوڈ کرنے کے لیے پہلے اکاؤنٹ بنانا لازمی ہے تاکہ کوئی اجنبی آپ کا بل ڈیلیٹ نہ کر سکے اور صرف آپ کو مکمل کنٹرول ملے۔
+            </p>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Bill Type Selector (bill_type) */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Select Bill Category / بل کی قسم منتخب کریں
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { en: 'Electricity Bill', ur: 'بجلی کا بل' },
-                { en: 'Sui Gas Bill', ur: 'سوئی گیس کا بل' },
-                { en: 'Water Bill', ur: 'پانی کا بل' },
-                { en: 'Medicine / Hospital', ur: 'ادویات و علاج' },
-              ].map((item) => {
-                const fullVal = `${item.en} / ${item.ur}`;
-                const isSelected = billType.startsWith(item.en);
-                return (
-                  <button
-                    key={item.en}
-                    type="button"
-                    onClick={() => setBillType(fullVal)}
-                    className={`p-2.5 rounded-xl text-xs text-center border cursor-pointer transition-all ${
-                      isSelected
-                        ? 'clay-mint-btn font-black border-transparent'
-                        : 'bg-white/80 border-emerald-100 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <div className="font-bold">{item.en}</div>
-                    <div className="font-urdu text-[11px] mt-0.5">{item.ur}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 1. Upload Bill Photo (image_url) */}
-          <div>
-            <label className="block text-xs sm:text-sm font-black text-slate-900 mb-2">
-              1. Upload Bill Photo / <span className="font-urdu font-bold text-emerald-800">بل کی تصویر لگائیں</span>
-            </label>
-
-            {billPhotoData ? (
-              <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-300 bg-white p-3 flex flex-col sm:flex-row items-center gap-4">
-                <img
-                  src={billPhotoData}
-                  alt="Bill preview"
-                  className="w-full sm:w-36 h-28 object-cover rounded-xl border border-slate-200"
-                />
-                <div className="flex-1 text-center sm:text-left">
-                  <div className="text-xs font-bold text-emerald-800 flex items-center justify-center sm:justify-start gap-1.5">
-                    <CheckCircle2 size={15} className="text-emerald-600" />
-                    <span>Photo Ready for Supabase / تصویر محفوظ ہونے کے لیے تیار</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">
-                    {uploadedFileName || 'bill_photo.jpg'}
-                  </div>
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+              {onOpenAuth && (
+                <>
                   <button
                     type="button"
-                    onClick={handleRemovePhoto}
-                    className="mt-2.5 text-xs text-rose-600 hover:text-rose-800 font-bold inline-flex items-center gap-1 cursor-pointer"
+                    onClick={() => onOpenAuth('signup')}
+                    className="clay-mint-btn w-full sm:w-auto px-7 py-3.5 rounded-2xl text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-lg"
                   >
-                    <X size={14} />
-                    <span>Change Photo / تصویر بدلیں</span>
+                    <UserPlus size={18} className="stroke-[2.5]" />
+                    <span>Create Account First / نیا اکاؤنٹ بنائیں</span>
                   </button>
-                </div>
-              </div>
-            ) : (
-              <label className="clay-mint-btn py-5 px-6 rounded-2xl flex items-center justify-center gap-3 cursor-pointer shadow-md group text-center w-full">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  disabled={isCompressing}
-                />
-                {isCompressing ? (
-                  <Loader2 size={26} className="animate-spin text-emerald-900" />
-                ) : (
-                  <UploadCloud size={28} className="stroke-[2.5]" />
-                )}
-                <div className="text-left">
-                  <div className="font-black text-sm text-[#064E3B]">
-                    {isCompressing ? 'Processing photo...' : 'Click to Upload Bill Photo / تصویر لگائیں'}
-                  </div>
-                  <div className="text-xs font-urdu font-bold text-emerald-950 mt-0.5">
-                    موبائل کیمرے سے تصویر کھینچیں یا گیلری سے اپلوڈ کریں
-                  </div>
-                </div>
-              </label>
-            )}
-          </div>
 
-          {/* 2. Bill Reference ID (reference_no) */}
-          <div>
-            <label className="block text-xs sm:text-sm font-black text-slate-900 mb-1.5">
-              2. Bill Reference ID / <span className="font-urdu font-bold text-emerald-800">بل کا ریفرنس نمبر</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-              placeholder="e.g. 14241150829100 (14 ہندسوں کا ریفرنس نمبر)"
-              className="w-full px-4 py-3 bg-white rounded-xl text-sm font-mono border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399] transition shadow-xs text-slate-900 font-bold"
-            />
-            <span className="text-[11px] text-slate-500 mt-1 block">
-              Found on the bill so donors can directly enter it into electricity / gas banking portals.
-            </span>
-          </div>
-
-          {/* 3. Bill Amount (amount: numeric) */}
-          <div>
-            <label className="block text-xs sm:text-sm font-black text-slate-900 mb-1.5">
-              3. Payable Amount (Rs.) / <span className="font-urdu font-bold text-emerald-800">بل کی کل رقم</span>
-            </label>
-            <input
-              type="number"
-              required
-              step="any"
-              min="1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 4850"
-              className="w-full px-4 py-3 bg-white rounded-xl text-sm font-mono border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399] transition shadow-xs text-slate-900 font-bold"
-            />
-          </div>
-
-          {/* 4. Optional Beneficiary Name & JazzCash/Account */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Full Name / نام (اختیاری):
-              </label>
-              <input
-                type="text"
-                value={personName}
-                onChange={(e) => setPersonName(e.target.value)}
-                placeholder="e.g. Muhammad Arshad"
-                className="w-full px-3.5 py-2.5 bg-white rounded-xl text-xs border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Account / JazzCash (اختیاری رقم منتقلی):
-              </label>
-              <input
-                type="text"
-                value={accountNo}
-                onChange={(e) => setAccountNo(e.target.value)}
-                placeholder="e.g. 0301-8492019"
-                className="w-full px-3.5 py-2.5 bg-white rounded-xl text-xs border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
-              />
-            </div>
-          </div>
-
-          {/* Submit Button (بل جمع کریں) */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting || isCompressing}
-              className="clay-mint-btn w-full py-4 rounded-2xl text-base sm:text-lg font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-60"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={22} className="animate-spin text-emerald-950" />
-                  <span>Saving to Database... سپابیس میں محفوظ ہو رہا ہے</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={22} className="stroke-[2.5]" />
-                  <span>Submit Bill / بل جمع کریں</span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuth('login')}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 bg-white hover:bg-emerald-50 border border-emerald-300 flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+                  >
+                    <LogIn size={16} />
+                    <span>Already have account? Sign In / لاگ ان</span>
+                  </button>
                 </>
               )}
-            </button>
-            <div className="text-center text-[11px] text-slate-500 mt-2 font-urdu">
-              بل جمع ہوتے ہی براہ راست کلاؤڈ ڈیٹا بیس میں محفوظ ہو جائے گا
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-emerald-100 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
+              <ShieldCheck size={15} className="text-emerald-600" />
+              <span>Takes only 10 seconds · بالکل مفت اور 100% محفوظ</span>
             </div>
           </div>
-        </form>
+        ) : (
+          /* ========================================================
+             CASE 2: USER IS LOGGED IN (FORM UNLOCKED & SECURED)
+             Now they can upload their bill directly
+             ======================================================== */
+          <>
+            {/* Logged in User Banner */}
+            <div className="mb-6 p-4 bg-emerald-50/95 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-black text-emerald-950">
+                    Logged In As: <span className="underline">{user.fullName || user.email}</span>
+                  </div>
+                  <div className="text-xs text-emerald-800 font-urdu font-bold mt-0.5">
+                    آپ کا اکاؤنٹ تصدیق شدہ ہے! یہ بل آپ کے نام محفوظ ہوگا اور صرف آپ اسے ڈیلیٹ کر سکیں گے
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shrink-0 shadow-2xs">
+                Active Uploader
+              </span>
+            </div>
+
+            {/* Form Title */}
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-emerald-100 pb-3">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                  Upload Your Bill / بل اپلوڈ کریں
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                  Saved directly in Supabase database & secured under your account.
+                </p>
+              </div>
+              <span className="text-xs font-urdu font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                آسان و محفوظ طریقہ
+              </span>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Bill Type Selector (bill_type) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Select Bill Category / بل کی قسم منتخب کریں
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { en: 'Electricity Bill', ur: 'بجلی کا بل' },
+                    { en: 'Sui Gas Bill', ur: 'سوئی گیس کا بل' },
+                    { en: 'Water Bill', ur: 'پانی کا بل' },
+                    { en: 'Medicine / Hospital', ur: 'ادویات و علاج' },
+                  ].map((item) => {
+                    const fullVal = `${item.en} / ${item.ur}`;
+                    const isSelected = billType.startsWith(item.en);
+                    return (
+                      <button
+                        key={item.en}
+                        type="button"
+                        onClick={() => setBillType(fullVal)}
+                        className={`p-2.5 rounded-xl text-xs text-center border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'clay-mint-btn font-black border-transparent'
+                            : 'bg-white/80 border-emerald-100 text-slate-700 hover:bg-white'
+                        }`}
+                      >
+                        <div className="font-bold">{item.en}</div>
+                        <div className="font-urdu text-[11px] mt-0.5">{item.ur}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 1. Upload Bill Photo (image_url) */}
+              <div>
+                <label className="block text-xs sm:text-sm font-black text-slate-900 mb-2">
+                  1. Upload Bill Photo / <span className="font-urdu font-bold text-emerald-800">بل کی تصویر لگائیں</span>
+                </label>
+
+                {billPhotoData ? (
+                  <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-300 bg-white p-3 flex flex-col sm:flex-row items-center gap-4">
+                    <img
+                      src={billPhotoData}
+                      alt="Bill preview"
+                      className="w-full sm:w-36 h-28 object-cover rounded-xl border border-slate-200"
+                    />
+                    <div className="flex-1 text-center sm:text-left">
+                      <div className="text-xs font-bold text-emerald-800 flex items-center justify-center sm:justify-start gap-1.5">
+                        <CheckCircle2 size={15} className="text-emerald-600" />
+                        <span>Photo Ready for Supabase / تصویر محفوظ ہونے کے لیے تیار</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">
+                        {uploadedFileName || 'bill_photo.jpg'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="mt-2.5 text-xs text-rose-600 hover:text-rose-800 font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <X size={14} />
+                        <span>Change Photo / تصویر بدلیں</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="clay-mint-btn py-5 px-6 rounded-2xl flex items-center justify-center gap-3 cursor-pointer shadow-md group text-center w-full">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      disabled={isCompressing}
+                    />
+                    {isCompressing ? (
+                      <Loader2 size={26} className="animate-spin text-emerald-900" />
+                    ) : (
+                      <UploadCloud size={28} className="stroke-[2.5]" />
+                    )}
+                    <div className="text-left">
+                      <div className="font-black text-sm text-[#064E3B]">
+                        {isCompressing ? 'Processing photo...' : 'Click to Upload Bill Photo / تصویر لگائیں'}
+                      </div>
+                      <div className="text-xs font-urdu font-bold text-emerald-950 mt-0.5">
+                        موبائل کیمرے سے تصویر کھینچیں یا گیلری سے اپلوڈ کریں
+                      </div>
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              {/* 2. Bill Reference ID (reference_no) */}
+              <div>
+                <label className="block text-xs sm:text-sm font-black text-slate-900 mb-1.5">
+                  2. Bill Reference ID / <span className="font-urdu font-bold text-emerald-800">بل کا ریفرنس نمبر</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={referenceNo}
+                  onChange={(e) => setReferenceNo(e.target.value)}
+                  placeholder="e.g. 14241150829100 (14 ہندسوں کا ریفرنس نمبر)"
+                  className="w-full px-4 py-3 bg-white rounded-xl text-sm font-mono border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399] transition shadow-xs text-slate-900 font-bold"
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Found on the bill so donors can directly enter it into electricity / gas banking portals.
+                </span>
+              </div>
+
+              {/* 3. Bill Amount (amount: numeric) */}
+              <div>
+                <label className="block text-xs sm:text-sm font-black text-slate-900 mb-1.5">
+                  3. Payable Amount (Rs.) / <span className="font-urdu font-bold text-emerald-800">بل کی کل رقم</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  step="any"
+                  min="1"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="e.g. 4850"
+                  className="w-full px-4 py-3 bg-white rounded-xl text-sm font-mono border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399] transition shadow-xs text-slate-900 font-bold"
+                />
+              </div>
+
+              {/* 4. Optional Beneficiary Name & JazzCash/Account */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Full Name / نام (اختیاری):
+                  </label>
+                  <input
+                    type="text"
+                    value={personName}
+                    onChange={(e) => setPersonName(e.target.value)}
+                    placeholder="e.g. Muhammad Arshad"
+                    className="w-full px-3.5 py-2.5 bg-white rounded-xl text-xs border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Account / JazzCash (اختیاری رقم منتقلی):
+                  </label>
+                  <input
+                    type="text"
+                    value={accountNo}
+                    onChange={(e) => setAccountNo(e.target.value)}
+                    placeholder="e.g. 0301-8492019"
+                    className="w-full px-3.5 py-2.5 bg-white rounded-xl text-xs border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button (بل جمع کریں) */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isCompressing}
+                  className="clay-mint-btn w-full py-4 rounded-2xl text-base sm:text-lg font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-60"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={22} className="animate-spin text-emerald-950" />
+                      <span>Saving to Database... سپابیس میں محفوظ ہو رہا ہے</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={22} className="stroke-[2.5]" />
+                      <span>Submit Bill / بل جمع کریں</span>
+                    </>
+                  )}
+                </button>
+                <div className="text-center text-[11px] text-slate-500 mt-2 font-urdu">
+                  بل جمع ہوتے ہی آپ کے اکاؤنٹ کے تحت براہ راست سپابیس ڈیٹا بیس میں محفوظ ہو جائے گا
+                </div>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
