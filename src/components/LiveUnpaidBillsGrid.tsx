@@ -337,10 +337,10 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
         </>
       )}
 
-      {/* TAB 2: MY BILLS (USER'S PERSONAL BILLS WITH EXCLUSIVE DELETE ACCESS) */}
+      {/* TAB 2: MY BILLS (USER'S PERSONAL BILLS WITH EXCLUSIVE DELETE ACCESS & PAID RECORDS) */}
       {activeTab === 'my_bills' && (
         <div>
-          {myBills.length === 0 ? (
+          {myBills.length === 0 && myClearedBills.length === 0 ? (
             <div className="glass-green-card rounded-3xl p-10 text-center max-w-lg mx-auto">
               <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto mb-3 shadow-inner">
                 <UserCheck size={28} />
@@ -349,7 +349,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                 No Bills In Your Account / آپ کا کوئی بل موجود نہیں ہے
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 mt-2 font-urdu leading-relaxed">
-                جب آپ بل اپلوڈ کریں گے تو وہ یہاں آپ کے ذاتی اکاؤنٹ کے پینل میں ظاہر ہو گا اور آپ اسے جب چاہیں ڈیلیٹ کر سکیں گے۔
+                جب آپ بل اپلوڈ کریں گے تو وہ یہاں آپ کے ذاتی اکاؤنٹ کے پینل میں ظاہر ہو گا اور جب کوئی اسے ادا کرے گا تو ادائیگی کی رسید بھی یہاں ہمیشہ محفوظ رہے گی۔
               </p>
 
               {!user && onOpenAuth && (
@@ -385,7 +385,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* My Bills Notice Banner */}
               <div className="clay-timer-badge p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left border border-emerald-300">
                 <div className="flex items-center gap-3">
@@ -397,83 +397,168 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       Your Managed Bills Panel / آپ کا ذاتی بل کنٹرول پینل
                     </div>
                     <div className="text-xs text-emerald-800 font-urdu mt-0.5">
-                      یہاں موجود تمام بلز پر مکمل کنٹرول صرف آپ کے پاس ہے، کوئی اجنبی انہیں ڈیلیٹ نہیں کر سکتا۔
+                      یہاں آپ کے تمام زیر التواء بلز اور ادا شدہ بلوں کی رسیدیں سپابیس کلاؤڈ میں مستقل محفوظ ہیں۔
                     </div>
                   </div>
                 </div>
-                <div className="bg-white/90 px-3.5 py-1.5 rounded-xl border border-emerald-200 text-xs font-black text-emerald-900 shrink-0">
-                  Total: {myBills.length} Active Bills
+                <div className="flex items-center gap-2">
+                  <div className="bg-white/90 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-black text-emerald-900 shrink-0">
+                    Active: {myBills.length}
+                  </div>
+                  <div className="bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300 text-xs font-black text-emerald-950 shrink-0">
+                    Paid: {myClearedBills.length}
+                  </div>
                 </div>
               </div>
 
-              {/* Grid of My Bills */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myBills.map((bill) => {
-                  const displayRef = cleanDisplayReference(bill.reference_no);
-                  return (
-                    <div
-                      key={bill.id}
-                      className="bg-white/95 rounded-3xl p-5 border-2 border-emerald-300 shadow-lg space-y-4 flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                            <ShieldCheck size={12} className="text-emerald-700" />
-                            <span>Your Bill / آپ کا بل</span>
-                          </span>
-                          <span className="font-black text-base text-emerald-900">
-                            Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}
-                          </span>
-                        </div>
-
-                        {/* Photo Preview */}
-                        <div className="my-3">
-                          <BillPhotoPreview
-                            photoKey={bill.image_url}
-                            referenceId={displayRef}
-                            amount={bill.amount}
-                            billType={bill.bill_type}
-                            onZoom={() => onOpenZoom(bill)}
-                          />
-                        </div>
-
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Category / نوعیت
-                          </div>
-                          <h4 className="font-black text-base text-slate-900 leading-snug">
-                            {bill.bill_type}
-                          </h4>
-                          <div className="text-xs text-slate-700 font-mono mt-1 break-all bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                            <strong>Reference ID:</strong> {displayRef}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Direct Delete Action */}
-                      <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                        {onOpenDelete && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenDelete(bill)}
-                            className="flex-1 py-2.5 rounded-xl text-xs font-black text-white bg-rose-600 hover:bg-rose-700 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                          >
-                            <Trash2 size={14} />
-                            <span>Delete This Bill / ڈیلیٹ کریں</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => onOpenZoom(bill)}
-                          className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-black bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
+              {/* SECTION A: Active Unpaid Bills */}
+              {myBills.length > 0 && (
+                <div>
+                  <h3 className="text-base font-black text-slate-900 mb-3 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Active Unpaid Bills ({myBills.length}) / زیر التواء بل</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myBills.map((bill) => {
+                      const displayRef = cleanDisplayReference(bill.reference_no);
+                      return (
+                        <div
+                          key={bill.id}
+                          className="bg-white/95 rounded-3xl p-5 border-2 border-emerald-300 shadow-lg space-y-4 flex flex-col justify-between"
                         >
-                          View / دیکھیں
-                        </button>
-                      </div>
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                                <ShieldCheck size={12} className="text-emerald-700" />
+                                <span>Your Bill / آپ کا بل</span>
+                              </span>
+                              <span className="font-black text-base text-emerald-900">
+                                Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}
+                              </span>
+                            </div>
+
+                            {/* Photo Preview */}
+                            <div className="my-3">
+                              <BillPhotoPreview
+                                photoKey={bill.image_url}
+                                referenceId={displayRef}
+                                amount={bill.amount}
+                                billType={bill.bill_type}
+                                onZoom={() => onOpenZoom(bill)}
+                              />
+                            </div>
+
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Category / نوعیت
+                              </div>
+                              <h4 className="font-black text-base text-slate-900 leading-snug">
+                                {bill.bill_type}
+                              </h4>
+                              <div className="text-xs text-slate-700 font-mono mt-1 break-all bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <strong>Reference ID:</strong> {displayRef}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Direct Delete Action */}
+                          <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                            {onOpenDelete && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenDelete(bill)}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-black text-white bg-rose-600 hover:bg-rose-700 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete This Bill / ڈیلیٹ کریں</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onOpenZoom(bill)}
+                              className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-black bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
+                            >
+                              View / دیکھیں
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION B: Permanently Saved Paid Bills (ادائیگی کا مستقل ریکارڈ) */}
+              {myClearedBills.length > 0 && (
+                <div className="pt-4 border-t border-emerald-100">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                        <CheckCircle2 size={18} className="text-emerald-600" />
+                        <span>Paid Bills Record ({myClearedBills.length}) / ادا شدہ بلوں کا ریکارڈ</span>
+                      </h3>
+                      <p className="text-xs text-slate-600 font-urdu mt-0.5">
+                        یہ بلز مخیر حضرات کی طرف سے ادا ہو چکے ہیں اور ان کی رسیدیں آپ کے ریکارڈ کے لیے محفوظ ہیں
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
+                    <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
+                      Permanently Saved / محفوظ
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myClearedBills.map((bill) => {
+                      const displayRef = cleanDisplayReference(bill.reference_no);
+                      return (
+                        <div
+                          key={bill.id}
+                          className="bg-emerald-50/70 rounded-3xl p-5 border-2 border-emerald-400/80 shadow-md space-y-3.5 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-xs font-black text-emerald-950 bg-emerald-200/90 px-3 py-1 rounded-full border border-emerald-300 flex items-center gap-1.5">
+                                <CheckCircle2 size={13} className="text-emerald-800" />
+                                <span>Paid & Cleared / ادا شدہ</span>
+                              </span>
+                              <span className="font-black text-base text-emerald-900">
+                                Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}
+                              </span>
+                            </div>
+
+                            {/* Paid Receipt Screenshot Preview */}
+                            <div className="my-3">
+                              <BillPhotoPreview
+                                photoKey={bill.image_url}
+                                referenceId={displayRef}
+                                amount={bill.amount}
+                                billType={bill.bill_type}
+                                onZoom={() => onOpenZoom(bill)}
+                              />
+                            </div>
+
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                                Paid Category / قسم
+                              </div>
+                              <h4 className="font-black text-base text-slate-900 leading-snug">
+                                {bill.bill_type}
+                              </h4>
+                              <div className="text-xs text-slate-700 font-mono mt-1 break-all bg-white p-2.5 rounded-xl border border-emerald-200">
+                                <strong>Ref:</strong> {displayRef}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-[11px] text-emerald-900">
+                            <span className="font-mono">Saved in Supabase</span>
+                            <span className="font-urdu font-bold">مستقل محفوظ ریکارڈ</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
