@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, AlertCircle, Loader2, Eye, EyeOff, Check, AlertTriangle } from 'lucide-react';
-import { signInUser, signUpUser } from '../services/authService';
+import {
+  X,
+  Lock,
+  Mail,
+  User,
+  ShieldCheck,
+  AlertCircle,
+  Loader2,
+  Eye,
+  EyeOff,
+  Check,
+  AlertTriangle,
+  LogIn,
+  CheckCircle2,
+} from 'lucide-react';
+import {
+  signInUser,
+  signUpUser,
+  DuplicateEmailError,
+  DUPLICATE_EMAIL_FULL_MESSAGE,
+} from '../services/authService';
 import { AppUser } from '../types/user';
 
 interface AuthModalProps {
@@ -25,20 +44,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
+  const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
 
   if (!isOpen) return null;
 
   const handleTabSwitch = (newMode: 'login' | 'signup') => {
     setMode(newMode);
     setErrorMsg('');
+    setInfoMsg('');
+    setIsDuplicateEmail(false);
     setConfirmPassword('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
+    if (isLoading) return; // Prevent multiple submissions while processing
 
-    if (!email.trim() || !password.trim()) {
+    setErrorMsg('');
+    setInfoMsg('');
+    setIsDuplicateEmail(false);
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password.trim()) {
       setErrorMsg('Please enter both email and password / ای میل اور پاس ورڈ دونوں درج کریں');
       return;
     }
@@ -55,7 +83,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
       if (password !== confirmPassword) {
-        setErrorMsg('Passwords do not match! Please check and type again / دونوں پاس ورڈ ایک جیسے نہیں ہیں، برائے مہربانی دوبارہ ٹائپ کریں۔');
+        setErrorMsg(
+          'Passwords do not match! Please check and type again / دونوں پاس ورڈ ایک جیسے نہیں ہیں، برائے مہربانی دوبارہ ٹائپ کریں۔'
+        );
         return;
       }
     }
@@ -63,23 +93,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
     try {
       if (mode === 'signup') {
-        const user = await signUpUser(email.trim(), password, fullName.trim());
-        onAuthSuccess(user);
-        onClose();
+        const result = await signUpUser(cleanEmail, password, fullName.trim());
+
+        if (result.isPendingConfirmation) {
+          // Email confirmation is required by Supabase project
+          setInfoMsg(
+            result.message ||
+              'Account created! Please check your email inbox to confirm your registration before signing in. / اکاؤنٹ بن گیا ہے! براہ کرم لاگ ان کرنے سے پہلے اپنی ای میل چیک کر کے تصدیق کریں۔'
+          );
+          setMode('login');
+          setPassword('');
+          setConfirmPassword('');
+          return;
+        }
+
+        if (result.user) {
+          onAuthSuccess(result.user);
+          onClose();
+        }
       } else {
-        const user = await signInUser(email.trim(), password);
+        const user = await signInUser(cleanEmail, password);
         onAuthSuccess(user);
         onClose();
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      let msg = err.message || 'Authentication failed. Please check your credentials.';
-      if (msg.includes('Invalid login credentials')) {
-        msg = 'Invalid email or password / غلط ای میل یا پاس ورڈ';
-      } else if (msg.includes('User already registered')) {
-        msg = 'This email is already registered. Please switch to Sign In / یہ ای میل پہلے سے موجود ہے، لاگ ان کریں۔';
+
+      if (
+        err instanceof DuplicateEmailError ||
+        (err.message && err.message.toLowerCase().includes('already registered')) ||
+        (err.message && err.message.toLowerCase().includes('already exists'))
+      ) {
+        setIsDuplicateEmail(true);
+        setErrorMsg(DUPLICATE_EMAIL_FULL_MESSAGE);
+      } else {
+        let msg = err.message || 'Authentication failed. Please check your credentials.';
+        if (msg.toLowerCase().includes('invalid login credentials')) {
+          msg = 'Incorrect email or password. Please try again / غلط ای میل یا پاس ورڈ۔ برائے مہربانی دوبارہ کوشش کریں۔';
+        } else if (msg.toLowerCase().includes('email not confirmed')) {
+          msg =
+            'Please confirm your email address before signing in. Check your inbox / لاگ ان کرنے سے پہلے اپنی ای میل کی تصدیق کریں۔ اپنے ان باکس میں تصدیقی لنک چیک کریں۔';
+        } else if (msg.toLowerCase().includes('rate limit')) {
+          msg =
+            'Too many attempts. Please wait a few minutes before trying again. / بہت زیادہ کوششیں کی گئی ہیں، براہ کرم کچھ دیر بعد کوشش کریں۔';
+        }
+        setErrorMsg(msg);
       }
-      setErrorMsg(msg);
     } finally {
       setIsLoading(false);
     }
@@ -158,10 +217,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
+        {/* Informational Message (e.g. Email verification notice) */}
+        {infoMsg && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-950 flex items-start gap-2">
+            <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+            <div className="leading-snug">
+              <strong className="block text-emerald-900">Email Verification Sent / تصدیقی ای میل بھیج دی گئی:</strong>
+              <div className="mt-0.5 font-urdu">{infoMsg}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Alert */}
         {errorMsg && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2">
-            <AlertCircle size={15} className="shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="mb-4 p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-xs text-rose-900 flex flex-col gap-2 shadow-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+              <div className="leading-snug">
+                <div className="font-bold">{errorMsg.split('/')[0]?.trim()}</div>
+                {errorMsg.includes('/') && (
+                  <div className="font-urdu font-bold text-rose-950 mt-1">
+                    {errorMsg.split('/')[1]?.trim()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick action button to switch to Sign In when duplicate email is detected */}
+            {isDuplicateEmail && (
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('login')}
+                className="mt-1 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
+              >
+                <LogIn size={14} />
+                <span>Switch to Sign In / لاگ ان پر جائیں</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -195,7 +287,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setErrorMsg('');
+                  setIsDuplicateEmail(false);
+                }}
                 placeholder="e.g. myname@gmail.com"
                 className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-xs sm:text-sm border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
               />

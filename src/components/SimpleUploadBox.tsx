@@ -479,7 +479,7 @@ export const SimpleUploadBox: React.FC<SimpleUploadBoxProps> = ({
                   <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-300 bg-white p-3 flex flex-col sm:flex-row items-center gap-4">
                     <img
                       src={billPhotoData}
-                      alt="Bill preview"
+                      alt="Utility bill assistance voucher preview - ClearMyBill"
                       className="w-full sm:w-36 h-28 object-cover rounded-xl border border-slate-200"
                     />
                     <div className="flex-1 text-center sm:text-left">

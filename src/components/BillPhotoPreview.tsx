@@ -36,7 +36,7 @@ export const BillPhotoPreview: React.FC<BillPhotoPreviewProps> = ({
       >
         <img
           src={photoKey}
-          alt={`Bill voucher ${referenceId}`}
+          alt={`${billType} bill assistance voucher ${referenceId} - ClearMyBill`}
           className="w-full h-44 object-cover group-hover:scale-102 transition-transform duration-200"
           referrerPolicy="no-referrer"
         />

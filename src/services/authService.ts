@@ -1,241 +1,223 @@
 import { supabase } from '../lib/supabase';
 import { AppUser } from '../types/user';
 
-const LOCAL_STORAGE_USER_KEY = 'clearmybill_user_session';
-const LOCAL_STORAGE_ACCOUNTS_KEY = 'clearmybill_registered_accounts';
+export const DUPLICATE_EMAIL_MESSAGE_EN = 'This email is already registered. Please sign in instead.';
+export const DUPLICATE_EMAIL_MESSAGE_UR = 'یہ ای میل پہلے سے رجسٹرڈ ہے۔ براہ کرم لاگ اِن کریں۔';
+export const DUPLICATE_EMAIL_FULL_MESSAGE = `${DUPLICATE_EMAIL_MESSAGE_EN} / ${DUPLICATE_EMAIL_MESSAGE_UR}`;
 
-interface StoredAccount {
-  id: string;
-  email: string;
-  fullName: string;
-  passwordHash: string;
-  createdAt: string;
-}
-
-// Generate deterministic safe User ID from email
-function generateDeterministicUserId(email: string): string {
-  const clean = email.toLowerCase().trim();
-  let hash = 0;
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32bit integer
-  }
-  const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  const b64 = btoa(clean).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
-  return `usr_${hex}_${b64}`;
-}
-
-// Simple browser-native SHA-256 password hashing
-async function hashPassword(password: string): Promise<string> {
-  try {
-    const msgUint8 = new TextEncoder().encode(password + '_clearmybill_secure_salt');
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-  } catch {
-    // Fallback if crypto.subtle is unavailable
-    return btoa(password + '_cmb_fallback');
+export class DuplicateEmailError extends Error {
+  constructor(message = DUPLICATE_EMAIL_FULL_MESSAGE) {
+    super(message);
+    this.name = 'DuplicateEmailError';
   }
 }
 
-function getStoredAccounts(): Record<string, StoredAccount> {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_ACCOUNTS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+/**
+ * Normalizes email address by trimming whitespace and converting to lowercase.
+ */
+export function normalizeEmail(email: string): string {
+  return (email || '').toLowerCase().trim();
 }
 
-function saveStoredAccount(account: StoredAccount): void {
-  try {
-    const accounts = getStoredAccounts();
-    accounts[account.email.toLowerCase().trim()] = account;
-    localStorage.setItem(LOCAL_STORAGE_ACCOUNTS_KEY, JSON.stringify(accounts));
-  } catch (err) {
-    console.error('Error saving account to local store:', err);
-  }
+/**
+ * Checks whether an error message or status code represents a duplicate user registration.
+ */
+export function isDuplicateEmailError(errorMsg?: string, status?: number): boolean {
+  if (!errorMsg) return false;
+  const lower = errorMsg.toLowerCase();
+  return (
+    lower.includes('user already registered') ||
+    lower.includes('user already exists') ||
+    lower.includes('already been registered') ||
+    lower.includes('email address already registered') ||
+    lower.includes('email already in use') ||
+    lower.includes('user with this email already exists') ||
+    (status === 422 && lower.includes('already'))
+  );
 }
 
+export interface SignUpResult {
+  user: AppUser | null;
+  isPendingConfirmation: boolean;
+  message?: string;
+}
+
+/**
+ * Retrieves the currently authenticated Supabase user session.
+ * Supabase Auth is the STRICT single source of truth.
+ * No localStorage user objects or local fallback accounts are accepted.
+ */
 export async function getCurrentUser(): Promise<AppUser | null> {
-  // 1. Check active Supabase session
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (!error && session?.user) {
-      const user: AppUser = {
-        id: session.user.id,
-        email: session.user.email || '',
-        fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-        createdAt: session.user.created_at,
-      };
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user));
-      return user;
+    if (error || !session?.user) {
+      return null;
     }
-  } catch (err) {
-    console.warn('Error reading supabase session:', err);
-  }
 
-  // 2. Check local stored user session
-  const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-    }
+    const authUser = session.user;
+    return {
+      id: authUser.id,
+      email: normalizeEmail(authUser.email || ''),
+      fullName: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+      createdAt: authUser.created_at,
+    };
+  } catch (err) {
+    console.error('Error getting Supabase session:', err);
+    return null;
   }
-  return null;
 }
 
-export async function signUpUser(email: string, password: string, fullName: string): Promise<AppUser> {
-  const cleanEmail = email.toLowerCase().trim();
+/**
+ * Registers a new user strictly through Supabase Auth.
+ * Enforces email normalization and strictly prevents duplicate email registration.
+ * Never creates local fallback accounts or bypasses authentication errors.
+ */
+export async function signUpUser(
+  email: string,
+  password: string,
+  fullName: string
+): Promise<SignUpResult> {
+  const cleanEmail = normalizeEmail(email);
   const cleanName = fullName.trim() || cleanEmail.split('@')[0];
 
-  let supabaseUser: AppUser | null = null;
-  let supabaseRateLimited = false;
+  if (!cleanEmail) {
+    throw new Error('Please enter a valid email address / براہ کرم درست ای میل درج کریں');
+  }
+  if (!password || password.length < 6) {
+    throw new Error('Password must be at least 6 characters / پاس ورڈ کم از کم 6 ہندسوں کا ہونا چاہیے');
+  }
 
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password,
-      options: {
-        data: {
-          full_name: cleanName,
-        },
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password,
+    options: {
+      data: {
+        full_name: cleanName,
       },
-    });
-
-    if (error) {
-      // Check if it's the known Supabase email rate limit error (status 429 or over_email_send_rate_limit)
-      const errStr = (error.message || '').toLowerCase();
-      if (
-        error.status === 429 ||
-        errStr.includes('rate limit') ||
-        errStr.includes('over_email_send_rate_limit') ||
-        errStr.includes('email rate limit')
-      ) {
-        console.warn('Supabase email rate limit reached. Activating Direct Secure Account Provisioning...');
-        supabaseRateLimited = true;
-      } else if (errStr.includes('user already registered')) {
-        // If user already registered, redirect to sign in or allow sign in
-        throw new Error('This email is already registered. Please click "Sign In / لاگ ان" to enter your account.');
-      } else {
-        throw new Error(error.message);
-      }
-    } else if (data?.user) {
-      supabaseUser = {
-        id: data.user.id,
-        email: data.user.email || cleanEmail,
-        fullName: cleanName,
-        createdAt: data.user.created_at,
-      };
-    }
-  } catch (err: any) {
-    const msg = (err.message || '').toLowerCase();
-    if (
-      msg.includes('rate limit') ||
-      msg.includes('over_email_send_rate_limit') ||
-      msg.includes('email rate limit')
-    ) {
-      supabaseRateLimited = true;
-    } else {
-      throw err;
-    }
-  }
-
-  // If Supabase signed up successfully without rate limit, return it
-  if (supabaseUser && !supabaseRateLimited) {
-    localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(supabaseUser));
-    // Also save in local accounts registry for offline fallback
-    const pwdHash = await hashPassword(password);
-    saveStoredAccount({
-      id: supabaseUser.id,
-      email: cleanEmail,
-      fullName: cleanName,
-      passwordHash: pwdHash,
-      createdAt: supabaseUser.createdAt || new Date().toISOString(),
-    });
-    return supabaseUser;
-  }
-
-  // Direct Secure Account Provisioning:
-  // When Supabase SMTP rate limit is triggered, activate account instantly so the user is never blocked!
-  const pwdHash = await hashPassword(password);
-  const directId = generateDeterministicUserId(cleanEmail);
-
-  const directUser: AppUser = {
-    id: directId,
-    email: cleanEmail,
-    fullName: cleanName,
-    createdAt: new Date().toISOString(),
-  };
-
-  saveStoredAccount({
-    id: directId,
-    email: cleanEmail,
-    fullName: cleanName,
-    passwordHash: pwdHash,
-    createdAt: directUser.createdAt!,
+    },
   });
 
-  localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(directUser));
-  return directUser;
+  // 1. Handle explicit Supabase Auth error responses
+  if (error) {
+    const errStr = (error.message || '').toLowerCase();
+    if (isDuplicateEmailError(error.message, error.status)) {
+      throw new DuplicateEmailError();
+    }
+    if (
+      error.status === 429 ||
+      errStr.includes('rate limit') ||
+      errStr.includes('over_email_send_rate_limit')
+    ) {
+      throw new Error(
+        'Email rate limit reached. Please wait a few minutes before trying again or sign in if you already have an account. / ای میل کی حد ختم ہو چکی ہے۔ براہ کرم کچھ منٹ بعد کوشش کریں یا لاگ ان کریں۔'
+      );
+    }
+    throw new Error(error.message);
+  }
+
+  // 2. Handle Supabase existing-user response behavior when email confirmation is enabled:
+  // When confirmation is enabled and the email is already registered, Supabase returns a fake/obfuscated
+  // user object with an EMPTY identities array ([]). This must be strictly caught as a duplicate registration!
+  if (
+    data?.user &&
+    Array.isArray(data.user.identities) &&
+    data.user.identities.length === 0
+  ) {
+    throw new DuplicateEmailError();
+  }
+
+  // 3. Handle email confirmation pending state:
+  // A new user was created, but email confirmation is pending and no authenticated session is returned yet.
+  if (!data?.session) {
+    return {
+      user: null,
+      isPendingConfirmation: true,
+      message:
+        'Registration successful! Please check your email inbox to verify your account, then sign in. / رجسٹریشن مکمل! براہ کرم لاگ ان کرنے سے پہلے اپنی ای میل کھول کر اکاؤنٹ کی تصدیق کریں۔',
+    };
+  }
+
+  // 4. Session established immediately (email confirmation disabled or auto-confirmed)
+  if (!data.user) {
+    throw new Error('Registration could not be completed. Please try again. / رجسٹریشن مکمل نہیں ہو سکی۔');
+  }
+
+  const appUser: AppUser = {
+    id: data.user.id,
+    email: normalizeEmail(data.user.email || cleanEmail),
+    fullName: cleanName,
+    createdAt: data.user.created_at,
+  };
+
+  return {
+    user: appUser,
+    isPendingConfirmation: false,
+  };
 }
 
+/**
+ * Signs in an existing user strictly using Supabase Auth.
+ * Never falls back to local password validation or fake credentials.
+ */
 export async function signInUser(email: string, password: string): Promise<AppUser> {
-  const cleanEmail = email.toLowerCase().trim();
+  const cleanEmail = normalizeEmail(email);
 
-  // 1. Try Supabase Auth first
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    });
-
-    if (!error && data?.user) {
-      const user: AppUser = {
-        id: data.user.id,
-        email: data.user.email || cleanEmail,
-        fullName: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-        createdAt: data.user.created_at,
-      };
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user));
-      return user;
-    }
-  } catch (err) {
-    console.warn('Supabase signInWithPassword warning, checking local store:', err);
+  if (!cleanEmail || !password) {
+    throw new Error('Please enter both email and password / ای میل اور پاس ورڈ دونوں درج کریں');
   }
 
-  // 2. Check local accounts registry
-  const accounts = getStoredAccounts();
-  const existing = accounts[cleanEmail];
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: cleanEmail,
+    password,
+  });
 
-  if (existing) {
-    const pwdHash = await hashPassword(password);
-    if (existing.passwordHash === pwdHash) {
-      const user: AppUser = {
-        id: existing.id,
-        email: existing.email,
-        fullName: existing.fullName,
-        createdAt: existing.createdAt,
-      };
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user));
-      return user;
-    } else {
-      throw new Error('Incorrect password. Please try again / پاس ورڈ غلط ہے، دوبارہ کوشش کریں۔');
+  if (error) {
+    const msg = (error.message || '').toLowerCase();
+    if (msg.includes('invalid login credentials')) {
+      throw new Error(
+        'Incorrect email or password. Please try again / غلط ای میل یا پاس ورڈ۔ برائے مہربانی دوبارہ کوشش کریں۔'
+      );
     }
+    if (msg.includes('email not confirmed')) {
+      throw new Error(
+        'Please confirm your email address before signing in. Check your inbox / لاگ ان کرنے سے پہلے اپنی ای میل کی تصدیق کریں۔ اپنے ان باکس میں تصدیقی لنک چیک کریں۔'
+      );
+    }
+    if (error.status === 429 || msg.includes('rate limit')) {
+      throw new Error(
+        'Too many login attempts. Please wait a moment and try again. / بہت زیادہ کوششیں کی گئی ہیں، براہ کرم کچھ دیر بعد کوشش کریں۔'
+      );
+    }
+    throw new Error(error.message || 'Login failed. Please check your credentials.');
   }
 
-  throw new Error('Invalid email or password / غلط ای میل یا پاس ورڈ۔ براہ کرم نیا اکاؤنٹ بنائیں یا پاس ورڈ چیک کریں۔');
+  if (!data?.user) {
+    throw new Error('Unable to complete login. Please try again. / لاگ ان مکمل نہیں ہو سکا۔');
+  }
+
+  return {
+    id: data.user.id,
+    email: normalizeEmail(data.user.email || cleanEmail),
+    fullName: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+    createdAt: data.user.created_at,
+  };
 }
 
+/**
+ * Signs out the current user via Supabase Auth and cleans up any legacy storage.
+ */
 export async function signOutUser(): Promise<void> {
   try {
-    await supabase.auth.signOut();
-  } catch (err) {
-    console.warn('Signout warning:', err);
-  } finally {
-    localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    // Clean up any legacy localStorage keys from prior sessions
+    localStorage.removeItem('clearmybill_user_session');
+    localStorage.removeItem('clearmybill_registered_accounts');
+  } catch {
+    // ignore
+  }
+
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error('Supabase signOut error:', error);
+    throw error;
   }
 }

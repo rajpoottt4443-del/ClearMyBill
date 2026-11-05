@@ -40,12 +40,12 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           ClearMyBill
         </h1>
 
-        {/* Bilingual Subtitle */}
+        {/* Bilingual Subtitle with Natural SEO Keywords */}
         <p className="text-base sm:text-lg lg:text-xl font-bold text-[#1E293B] max-w-2xl mx-auto leading-relaxed">
-          Direct Peer-to-Peer Bill Relief Platform
+          Online Bill Relief Platform · Utility & Emergency Bill Payment Assistance
         </p>
         <p className="text-sm sm:text-base text-emerald-900 font-urdu font-bold mt-1 max-w-xl mx-auto leading-relaxed">
-          ضرورت مند لوگ اپنے بل اپلوڈ کریں اور دنیا بھر کے مخیر حضرات براہِ راست بل یا رقم ادا کر کے مدد کریں۔
+          ضرورت مند خاندان اپنے بجلی، گیس، پانی یا میڈیکل بل اپلوڈ کریں اور دنیا بھر کے مخیر بھائی براہِ راست فلاحی ادائیگی کریں۔
         </p>
 
         {/* Quick Dual Action Badges */}

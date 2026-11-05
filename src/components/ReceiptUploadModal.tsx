@@ -360,7 +360,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
                 <div className="max-h-48 flex items-center justify-center overflow-hidden rounded-xl bg-black/5">
                   <img
                     src={receiptImage}
-                    alt="Uploaded receipt preview"
+                    alt="Uploaded payment transaction receipt preview - ClearMyBill"
                     className="max-h-44 object-contain"
                   />
                 </div>

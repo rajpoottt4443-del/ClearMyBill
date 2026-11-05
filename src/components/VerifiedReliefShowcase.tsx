@@ -89,7 +89,7 @@ export const VerifiedReliefShowcase: React.FC<VerifiedReliefShowcaseProps> = ({
                   <div className="relative rounded-xl overflow-hidden mb-3 aspect-[4/3] bg-emerald-50 border border-emerald-100 flex items-center justify-center group-hover:border-emerald-300 transition">
                     <img
                       src={bill.image_url}
-                      alt="Paid Bill Receipt"
+                      alt={`Cleared ${bill.bill_type} payment receipt proof - ClearMyBill`}
                       className="w-full h-full object-cover object-top"
                     />
                     <div className="absolute inset-0 bg-emerald-900/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

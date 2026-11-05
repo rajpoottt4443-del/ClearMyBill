@@ -52,13 +52,17 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        setUser({
+        const authUser: AppUser = {
           id: session.user.id,
-          email: session.user.email || '',
-          fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-        });
+          email: (session.user.email || '').toLowerCase().trim(),
+          fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          createdAt: session.user.created_at,
+        };
+        setUser(authUser);
+        setUserBankAccounts(getUserBankAccounts(session.user.id));
       } else {
         setUser(null);
+        setUserBankAccounts([]);
       }
     });
 

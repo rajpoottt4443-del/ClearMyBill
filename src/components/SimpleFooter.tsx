@@ -23,14 +23,16 @@ export const SimpleFooter: React.FC = () => {
 
         <div className="pt-4 border-t border-emerald-100/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div>
-            © {new Date().getFullYear()} ClearMyBill · Direct Peer Relief Platform
+            © {new Date().getFullYear()} ClearMyBill · Online Bill Relief Platform · Pakistan Bill Payment Assistance
           </div>
-          <div className="flex items-center gap-4 text-[11px] font-semibold text-emerald-800">
-            <span>Direct Utility Payments</span>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-emerald-800">
+            <span>Utility Bill Assistance</span>
             <span>·</span>
-            <span>JazzCash / Easypaisa</span>
+            <span>Electricity & Gas Relief</span>
             <span>·</span>
-            <span>Saved Paid Records / محفوظ ریکارڈ</span>
+            <span>Medical & Emergency Aid</span>
+            <span>·</span>
+            <span>Direct Payment / محفوظ ریکارڈ</span>
           </div>
         </div>
       </div>
