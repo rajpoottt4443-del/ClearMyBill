@@ -5,12 +5,16 @@ interface BrandHeaderProps {
   onScrollToUpload: () => void;
   onScrollToBills: () => void;
   unpaidCount: number;
+  clearedCount?: number;
+  clearedTotalAmount?: number;
 }
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({
   onScrollToUpload,
   onScrollToBills,
   unpaidCount,
+  clearedCount = 0,
+  clearedTotalAmount = 0,
 }) => {
   return (
     <header className="relative pt-10 pb-8 sm:pt-14 sm:pb-10 overflow-hidden text-center">
@@ -92,6 +96,39 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Live Relief Impact Banner (Social Proof) */}
+        {clearedCount > 0 && (
+          <div className="mt-8 p-4 rounded-3xl bg-white/95 border-2 border-emerald-300 shadow-md flex flex-wrap items-center justify-around gap-4 text-center max-w-2xl mx-auto">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Verified Relief Given / کل ادا شدہ رقم
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-emerald-800">
+                Rs. {clearedTotalAmount.toLocaleString()}+
+              </div>
+            </div>
+            <div className="hidden sm:block w-px h-10 bg-emerald-200" />
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Bills Cleared / کامیاب بلز
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900">
+                {clearedCount} Families Helped
+              </div>
+            </div>
+            <div className="hidden sm:block w-px h-10 bg-emerald-200" />
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Relief Proof / شفافیت
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 size={18} />
+                <span>100% Genuine</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

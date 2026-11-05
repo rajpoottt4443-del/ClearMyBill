@@ -7,6 +7,7 @@ import { BillZoomModal } from './components/BillZoomModal';
 import { ReceiptUploadModal } from './components/ReceiptUploadModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AuthModal } from './components/AuthModal';
+import { VerifiedReliefShowcase } from './components/VerifiedReliefShowcase';
 import { SimpleFooter } from './components/SimpleFooter';
 import { BillItem, NewBillPayload } from './types/bill';
 import { AppUser } from './types/user';
@@ -14,6 +15,7 @@ import { fetchUnpaidBills, fetchPaidBills, insertBill, markBillAsPaid, deleteBil
 import { getCurrentUser, signOutUser } from './services/authService';
 import { supabase } from './lib/supabase';
 import { X, Sparkles } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const [bills, setBills] = useState<BillItem[]>([]);
@@ -209,6 +211,10 @@ export default function App() {
   };
 
   const myBillsCount = bills.filter((b) => isBillOwner(b, user)).length;
+  const clearedTotalAmount = clearedBills.reduce(
+    (acc, b) => acc + (Number(b.amount) || 0),
+    0
+  );
 
   return (
     <div className="min-h-screen bg-[#F8FAF9] text-[#1E293B] antialiased flex flex-col selection:bg-[#34D399]/30 selection:text-black">
@@ -258,6 +264,18 @@ export default function App() {
           onScrollToUpload={scrollToUpload}
           onScrollToBills={scrollToBills}
           unpaidCount={bills.length}
+          clearedCount={clearedBills.length}
+          clearedTotalAmount={clearedTotalAmount}
+        />
+
+        {/* Real Proof of Relief Showcase (زندہ ثبوت اور رسیدیں) */}
+        <VerifiedReliefShowcase
+          clearedBills={clearedBills}
+          onOpenZoom={(bill) => setZoomedBill(bill)}
+          onViewAllCleared={() => {
+            setActiveFeedTab('cleared');
+            document.getElementById('unpaid-bills')?.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
 
         {/* 1. Simple Bill Upload Box (بل اپلوڈ کرنے کا خانہ) */}
@@ -322,6 +340,9 @@ export default function App() {
         onAuthSuccess={handleAuthSuccess}
         initialMode={authModalMode}
       />
+
+      {/* Vercel Analytics */}
+      <Analytics />
     </div>
   );
 }
