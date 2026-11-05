@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Copy, Check, Search, CheckCircle2, RotateCw, Loader2, Trash2, UserCheck, ShieldCheck, LogIn, Lock } from 'lucide-react';
+import { Copy, Check, Search, CheckCircle2, RotateCw, Loader2, Trash2, UserCheck, ShieldCheck, LogIn, Lock, Building2 } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { AppUser } from '../types/user';
 import { CountdownTimer } from './CountdownTimer';
 import { BillPhotoPreview } from './BillPhotoPreview';
-import { isBillOwner, cleanDisplayReference } from '../services/billService';
+import { isBillOwner, cleanDisplayReference, extractBillBankAccount } from '../services/billService';
 
 interface LiveUnpaidBillsGridProps {
   bills: BillItem[];
@@ -18,6 +18,7 @@ interface LiveUnpaidBillsGridProps {
   onOpenReceiptUpload: (bill: BillItem) => void;
   onOpenDelete?: (bill: BillItem) => void;
   onOpenAuth?: (mode?: 'login' | 'signup') => void;
+  onOpenBankAccounts?: () => void;
 }
 
 export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
@@ -32,6 +33,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
   onOpenReceiptUpload,
   onOpenDelete,
   onOpenAuth,
+  onOpenBankAccounts,
 }) => {
   const [internalTab, setInternalTab] = useState<'unpaid' | 'my_bills' | 'cleared'>('unpaid');
   const activeTab = controlledTab || internalTab;
@@ -196,7 +198,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       document.getElementById('upload-box')?.scrollIntoView({ behavior: 'smooth' });
                     }
                   }}
-                  className="clay-mint-btn inline-flex items-center gap-2 mt-5 px-7 py-3 rounded-full text-xs sm:text-sm font-black text-[#064E3B] cursor-pointer shadow-md"
+                  className="clay-mint-btn inline-flex items-center gap-2 mt-5 px-7 py-3 rounded-full text-xs sm:text-sm font-black text-white cursor-pointer shadow-md"
                 >
                   <span>Upload a Bill / بل اپلوڈ کریں</span>
                 </button>
@@ -207,6 +209,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
               {filteredUnpaid.map((bill) => {
                 const isOwner = isBillOwner(bill, user);
                 const displayRef = cleanDisplayReference(bill.reference_no);
+                const attachedBank = extractBillBankAccount(bill.reference_no);
 
                 return (
                   <div
@@ -215,25 +218,14 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       isOwner ? 'ring-2 ring-emerald-400 bg-white/90' : ''
                     }`}
                   >
-                    {/* Card Top: 48-Hour Countdown Badge + Amount + Owner Badge / Delete */}
+                    {/* Card Top: Appeal Status Badge + Amount + Owner Badge / Delete */}
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <CountdownTimer createdAt={bill.created_at} />
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-full border border-emerald-300/80">
+                          <span className="text-xs font-black text-emerald-950 bg-emerald-100/90 px-3 py-1 rounded-full border border-emerald-300/80">
                             Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}
                           </span>
-                          {/* Only show delete button to owner or authorized user */}
-                          {isOwner && onOpenDelete && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenDelete(bill)}
-                              title="Delete your bill / اپنا بل ڈیلیٹ کریں"
-                              className="p-1.5 rounded-xl text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
                         </div>
                       </div>
 
@@ -300,13 +292,40 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                           )}
                         </button>
                       </div>
+
+                      {/* Attached Receiving Bank / Wallet details if available */}
+                      {attachedBank && (
+                        <div className="bg-emerald-50/90 p-2.5 rounded-2xl border border-emerald-300/80 mb-3 flex items-center justify-between text-xs">
+                          <div className="truncate mr-2">
+                            <span className="text-[10px] font-bold text-emerald-800 flex items-center gap-1">
+                              <Building2 size={11} className="text-emerald-700" />
+                              <span>{attachedBank.bankName} (براہ راست ٹرانسفر)</span>
+                            </span>
+                            <span className="font-mono font-bold text-emerald-950 block truncate text-xs">
+                              {attachedBank.accountNumber}
+                            </span>
+                            <span className="text-[10px] text-slate-500 block truncate">
+                              Title: {attachedBank.accountTitle}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(attachedBank.accountNumber, `bank-${bill.id}`)}
+                            className="px-2 py-1 bg-white hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[10px] font-bold text-emerald-900 flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                            title="Copy Account Number / اکاؤنٹ کاپی کریں"
+                          >
+                            {copiedId === `bank-${bill.id}` ? <Check size={11} className="text-emerald-700" /> : <Copy size={11} />}
+                            <span>{copiedId === `bank-${bill.id}` ? 'Copied' : 'Copy Acc'}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Button: I Paid This - Upload Receipt */}
                     <div className="pt-2 border-t border-emerald-100">
                       <button
                         onClick={() => onOpenReceiptUpload(bill)}
-                        className="clay-mint-btn w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-md group"
+                        className="clay-mint-btn w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer shadow-md group"
                       >
                         <CheckCircle2 size={16} className="stroke-[2.5]" />
                         <span>I Paid This - Upload Receipt</span>
@@ -314,20 +333,6 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       <div className="text-center text-[10px] text-emerald-900 font-urdu font-bold mt-1.5">
                         بل ادا کر دیا (رسید اپلوڈ کریں)
                       </div>
-
-                      {/* Delete Option for Owner */}
-                      {isOwner && onOpenDelete && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => onOpenDelete(bill)}
-                            className="text-[11px] text-rose-600 hover:text-rose-800 inline-flex items-center gap-1.5 font-bold transition-colors cursor-pointer py-1 px-3 rounded-lg hover:bg-rose-50"
-                          >
-                            <Trash2 size={13} />
-                            <span>Delete My Bill / اپنا بل ڈیلیٹ کریں</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -360,7 +365,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenAuth('login')}
-                    className="clay-mint-btn px-6 py-2.5 rounded-full text-xs font-black text-[#064E3B] inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    className="clay-mint-btn px-6 py-2.5 rounded-full text-xs font-black text-white inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <LogIn size={14} />
                     <span>Sign In to Your Account / اپنے اکاؤنٹ میں لاگ ان کریں</span>
@@ -378,7 +383,7 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                       document.getElementById('upload-box')?.scrollIntoView({ behavior: 'smooth' });
                     }
                   }}
-                  className="clay-mint-btn px-6 py-2.5 rounded-full text-xs font-black text-[#064E3B] shadow-sm cursor-pointer"
+                  className="clay-mint-btn px-6 py-2.5 rounded-full text-xs font-black text-white shadow-sm cursor-pointer"
                 >
                   <span>Upload a Bill Now / نیا بل اپلوڈ کریں</span>
                 </button>
@@ -401,13 +406,23 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="bg-white/90 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-black text-emerald-900 shrink-0">
                     Active: {myBills.length}
                   </div>
                   <div className="bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300 text-xs font-black text-emerald-950 shrink-0">
                     Paid: {myClearedBills.length}
                   </div>
+                  {onOpenBankAccounts && (
+                    <button
+                      type="button"
+                      onClick={onOpenBankAccounts}
+                      className="clay-mint-btn px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-950 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Building2 size={13} className="text-emerald-700" />
+                      <span>Bank Accounts / بینک اکاؤنٹس</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -626,20 +641,9 @@ export const LiveUnpaidBillsGrid: React.FC<LiveUnpaidBillsGridProps> = ({
                             <span>Paid & Saved / ادا شدہ</span>
                           </span>
                           <div className="flex items-center gap-1.5">
-                            <span className="font-black text-sm text-emerald-900">
+                            <span className="font-black text-sm text-emerald-950">
                               Rs. {bill.amount ? Number(bill.amount).toLocaleString() : '0'}
                             </span>
-                            {/* Allow owner to delete their record if they wish */}
-                            {isOwner && onOpenDelete && (
-                              <button
-                                type="button"
-                                onClick={() => onOpenDelete(bill)}
-                                title="Delete record / ریکارڈ ڈیلیٹ کریں"
-                                className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
                           </div>
                         </div>
 

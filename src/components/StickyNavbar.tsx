@@ -1,25 +1,29 @@
 import React from 'react';
-import { User, LogOut, FileText, PlusCircle, ShieldCheck } from 'lucide-react';
+import { User, LogOut, FileText, PlusCircle, ShieldCheck, Building2 } from 'lucide-react';
 import { AppUser } from '../types/user';
 
 interface StickyNavbarProps {
   user: AppUser | null;
   myBillsCount: number;
+  bankAccountsCount?: number;
   onOpenAuth: (mode?: 'login' | 'signup') => void;
   onLogout: () => void;
   onScrollToUpload: () => void;
   onScrollToBills: () => void;
   onViewMyBills: () => void;
+  onOpenBankAccounts?: () => void;
 }
 
 export const StickyNavbar: React.FC<StickyNavbarProps> = ({
   user,
   myBillsCount,
+  bankAccountsCount = 0,
   onOpenAuth,
   onLogout,
   onScrollToUpload,
   onScrollToBills,
   onViewMyBills,
+  onOpenBankAccounts,
 }) => {
   return (
     <nav className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#F8FAF9]/85 border-b border-emerald-200/50 shadow-xs transition-all">
@@ -77,6 +81,21 @@ export const StickyNavbar: React.FC<StickyNavbarProps> = ({
                 </span>
               </button>
 
+              {onOpenBankAccounts && (
+                <button
+                  onClick={onOpenBankAccounts}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-950 bg-white/85 hover:bg-white border border-emerald-300/80 flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                  title="Manage Pakistani Bank Accounts / اپنے پاکستانی بینک اکاؤنٹس دیکھیں"
+                >
+                  <Building2 size={13} className="text-emerald-700" />
+                  <span className="hidden md:inline">Bank Accounts</span>
+                  <span className="font-urdu md:hidden">بینک</span>
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                    {bankAccountsCount}
+                  </span>
+                </button>
+              )}
+
               <div className="flex items-center gap-1.5 bg-white/90 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-bold">
                 <User size={13} className="text-emerald-700 shrink-0" />
                 <span className="max-w-[100px] truncate text-slate-800 font-bold" title={user.email}>
@@ -95,7 +114,7 @@ export const StickyNavbar: React.FC<StickyNavbarProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="clay-mint-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-black text-[#064E3B] flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="clay-mint-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-black text-white flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <ShieldCheck size={14} className="stroke-[2.5]" />
                 <span>Create Account / اکاؤنٹ بنائیں</span>

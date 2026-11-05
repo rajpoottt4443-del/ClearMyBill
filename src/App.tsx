@@ -7,12 +7,15 @@ import { BillZoomModal } from './components/BillZoomModal';
 import { ReceiptUploadModal } from './components/ReceiptUploadModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AuthModal } from './components/AuthModal';
+import { BankAccountsModal } from './components/BankAccountsModal';
 import { VerifiedReliefShowcase } from './components/VerifiedReliefShowcase';
 import { SimpleFooter } from './components/SimpleFooter';
 import { BillItem, NewBillPayload } from './types/bill';
 import { AppUser } from './types/user';
+import { PakistaniBankAccount } from './types/bankAccount';
 import { fetchUnpaidBills, fetchPaidBills, insertBill, markBillAsPaid, deleteBill, isBillOwner } from './services/billService';
 import { getCurrentUser, signOutUser } from './services/authService';
+import { getUserBankAccounts } from './services/bankAccountService';
 import { supabase } from './lib/supabase';
 import { X, Sparkles } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
@@ -31,12 +34,21 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('signup');
 
+  // Pakistani Bank Accounts Modal State
+  const [isBankAccountsModalOpen, setIsBankAccountsModalOpen] = useState<boolean>(false);
+  const [userBankAccounts, setUserBankAccounts] = useState<PakistaniBankAccount[]>([]);
+
   // Feed Tab State
   const [activeFeedTab, setActiveFeedTab] = useState<'unpaid' | 'my_bills' | 'cleared'>('unpaid');
 
   // Load user session on mount
   useEffect(() => {
-    getCurrentUser().then((u) => setUser(u));
+    getCurrentUser().then((u) => {
+      setUser(u);
+      if (u?.id) {
+        setUserBankAccounts(getUserBankAccounts(u.id));
+      }
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -142,14 +154,14 @@ export default function App() {
     }
   };
 
-  // Delete bill from Supabase database (بل ڈیٹا بیس سے ڈیلیٹ کریں)
-  const handleDeleteBill = async (billId: string, enteredPin?: string) => {
+  // Delete bill from Supabase database (بل صرف اصل اکاؤنٹ سے ڈیلیٹ کریں)
+  const handleDeleteBill = async (billId: string) => {
     const target = bills.find((b) => b.id === billId) || clearedBills.find((b) => b.id === billId);
     if (!target) return;
 
-    if (!isBillOwner(target, user, enteredPin)) {
+    if (!user || !isBillOwner(target, user)) {
       showConfirmation(
-        'Access Denied: You are not authorized to delete this bill. Only the verified owner or correct PIN can delete it. / رسائی مسترد: صرف اصل مالک یا درست پن کوڈ کے ساتھ ہی بل ڈیلیٹ کیا جا سکتا ہے۔'
+        'Access Denied: You must be logged into the verified creator account to delete this bill. / رسائی مسترد: صرف بل بنانے والا رجسٹرڈ اکاؤنٹ ہی اسے ڈیلیٹ کر سکتا ہے۔'
       );
       return;
     }
@@ -158,7 +170,7 @@ export default function App() {
     setBills((prev) => prev.filter((b) => b.id !== billId));
     setClearedBills((prev) => prev.filter((b) => b.id !== billId));
     try {
-      await deleteBill(billId, user, enteredPin, target);
+      await deleteBill(billId, user, target);
       showConfirmation(
         'Bill deleted successfully from Supabase database! / بل کلاؤڈ ڈیٹا بیس سے کامیابی سے ڈیلیٹ کر دیا گیا ہے۔'
       );
@@ -176,16 +188,31 @@ export default function App() {
     setIsAuthModalOpen(true);
   };
 
+  const handleOpenBankAccounts = () => {
+    if (!user) {
+      handleOpenAuth('signup');
+      showConfirmation(
+        'Account Required: Please sign in or create an account to manage bank accounts / بینک اکاؤنٹس کے لیے پہلے اکاؤنٹ بنائیں'
+      );
+      return;
+    }
+    setIsBankAccountsModalOpen(true);
+  };
+
   const handleLogout = async () => {
     await signOutUser();
     setUser(null);
+    setUserBankAccounts([]);
     showConfirmation('Logged out successfully / آپ کا اکاؤنٹ لاگ آؤٹ ہو گیا ہے۔');
   };
 
   const handleAuthSuccess = (loggedUser: AppUser) => {
     setUser(loggedUser);
+    if (loggedUser.id) {
+      setUserBankAccounts(getUserBankAccounts(loggedUser.id));
+    }
     showConfirmation(
-      `Account Created! Welcome, ${loggedUser.fullName || loggedUser.email}. You can now upload your bill below. / اکاؤنٹ بن گیا ہے! اب آپ نیچے اپنا بل اپلوڈ کر سکتے ہیں۔`
+      `Account Created! Welcome, ${loggedUser.fullName || loggedUser.email}. You can now upload your bill or add bank accounts. / اکاؤنٹ بن گیا ہے! اب آپ بل اپلوڈ یا بینک اکاؤنٹ شامل کر سکتے ہیں۔`
     );
     setTimeout(() => {
       document.getElementById('upload-box')?.scrollIntoView({ behavior: 'smooth' });
@@ -232,11 +259,13 @@ export default function App() {
       <StickyNavbar
         user={user}
         myBillsCount={myBillsCount}
+        bankAccountsCount={userBankAccounts.length}
         onOpenAuth={handleOpenAuth}
         onLogout={handleLogout}
         onScrollToUpload={scrollToUpload}
         onScrollToBills={scrollToBills}
         onViewMyBills={handleViewMyBills}
+        onOpenBankAccounts={handleOpenBankAccounts}
       />
 
       {/* Soft Green Confirmation Toast Banner */}
@@ -294,6 +323,8 @@ export default function App() {
             onBillSubmitted={handleBillSubmitted}
             user={user}
             onOpenAuth={handleOpenAuth}
+            onOpenBankAccounts={handleOpenBankAccounts}
+            userBankAccounts={userBankAccounts}
           />
         </div>
 
@@ -310,6 +341,7 @@ export default function App() {
           onOpenReceiptUpload={(bill) => setPayingBill(bill)}
           onOpenDelete={(bill) => setDeletingBill(bill)}
           onOpenAuth={handleOpenAuth}
+          onOpenBankAccounts={handleOpenBankAccounts}
         />
       </main>
 
@@ -322,11 +354,10 @@ export default function App() {
         isOpen={!!zoomedBill}
         onClose={() => setZoomedBill(null)}
         onPayClick={(bill) => setPayingBill(bill)}
-        onDeleteClick={(bill) => setDeletingBill(bill)}
         user={user}
       />
 
-      {/* Receipt Upload & Auto-Delete Modal */}
+      {/* Receipt Upload & Saved Paid Records Modal */}
       <ReceiptUploadModal
         bill={payingBill}
         isOpen={!!payingBill}
@@ -334,7 +365,7 @@ export default function App() {
         onReceiptUploaded={handleReceiptUploaded}
       />
 
-      {/* Delete Confirmation Modal with Ownership & Security PIN Verification */}
+      {/* Delete Confirmation Modal with Strict Account Ownership Verification */}
       <DeleteConfirmModal
         bill={deletingBill}
         user={user}
@@ -350,6 +381,14 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
         initialMode={authModalMode}
+      />
+
+      {/* Pakistani Bank Accounts Modal (Multiple Accounts Management) */}
+      <BankAccountsModal
+        isOpen={isBankAccountsModalOpen}
+        onClose={() => setIsBankAccountsModalOpen(false)}
+        user={user}
+        onAccountsUpdated={(updated) => setUserBankAccounts(updated)}
       />
 
       {/* Vercel Analytics */}

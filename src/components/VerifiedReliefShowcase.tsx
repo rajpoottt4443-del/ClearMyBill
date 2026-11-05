@@ -138,7 +138,7 @@ export const VerifiedReliefShowcase: React.FC<VerifiedReliefShowcaseProps> = ({
           <button
             type="button"
             onClick={onViewAllCleared}
-            className="clay-mint-btn px-5 py-2.5 rounded-full text-xs font-black text-[#064E3B] inline-flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+            className="clay-mint-btn px-5 py-2.5 rounded-full text-xs font-black text-white inline-flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
           >
             <span>View All {clearedBills.length} Paid Bills / تمام ادا شدہ بل دیکھیں</span>
             <ArrowRight size={14} />

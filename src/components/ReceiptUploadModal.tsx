@@ -87,7 +87,7 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             Upload Payment Receipt / رسید اپلوڈ کریں
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 font-urdu">
-            ادائیگی کی تصویر یا اسکرین شاٹ لگائیں تاکہ یہ بل خود بخود لسٹ سے ہٹا دیا جائے
+            ادائیگی کی رسید اپلوڈ کریں تاکہ یہ بل ادا شدہ ریکارڈ کے طور پر ہمیشہ محفوظ ہو جائے
           </p>
         </div>
 
@@ -156,11 +156,11 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             />
           </div>
 
-          {/* Auto-Delete Notice */}
+          {/* Paid Record Notice */}
           <div className="p-3 bg-emerald-50/90 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
             <ShieldCheck size={16} className="text-emerald-700 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
-              <strong>Instant Auto-Delete Logic / آٹومیٹک ڈیلیٹ:</strong> Submitting this receipt immediately removes the bill card from the unpaid grid so other donors know it has been cleared!
+              <strong>Permanent Paid Record / مستقل محفوظ ریکارڈ:</strong> Submitting this receipt marks the bill as PAID and preserves your payment receipt screenshot permanently in the Cleared Bills Archive so all donors can see proof of relief!
             </div>
           </div>
 
@@ -169,14 +169,14 @@ export const ReceiptUploadModal: React.FC<ReceiptUploadModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="clay-mint-btn w-full py-3.5 rounded-2xl text-sm sm:text-base font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-60"
+              className="clay-mint-btn w-full py-3.5 rounded-2xl text-sm sm:text-base font-black flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-60"
             >
               {isSubmitting ? (
-                <span>Removing bill... بل لسٹ سے ہٹایا جا رہا ہے</span>
+                <span>Saving paid record... رسید اور ریکارڈ محفوظ ہو رہا ہے</span>
               ) : (
                 <>
                   <Sparkles size={18} />
-                  <span>Confirm Receipt & Auto-Delete Bill / بل ہٹائیں</span>
+                  <span>Confirm Receipt & Save to Paid Bills / رسید جمع اور ادا شدہ محفوظ کریں</span>
                 </>
               )}
             </button>

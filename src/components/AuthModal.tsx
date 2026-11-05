@@ -287,7 +287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isLoading || (mode === 'signup' && isPasswordMismatch)}
-            className="clay-mint-btn w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2 disabled:opacity-50"
+            className="clay-mint-btn w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2 disabled:opacity-50"
           >
             {isLoading ? (
               <>

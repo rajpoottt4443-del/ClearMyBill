@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2, AlertTriangle, X, Loader2, ShieldCheck, KeyRound, Lock, LogIn } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, AlertTriangle, X, Loader2, ShieldCheck, Lock, LogIn } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { AppUser } from '../types/user';
-import { isBillOwner, hasBillSecurityPin, hasBillOwnerAccount, cleanDisplayReference } from '../services/billService';
+import { isBillOwner, cleanDisplayReference } from '../services/billService';
 
 interface DeleteConfirmModalProps {
   bill: BillItem | null;
   user: AppUser | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmDelete: (billId: string, enteredPin?: string) => Promise<void>;
+  onConfirmDelete: (billId: string) => Promise<void>;
   onOpenAuth?: () => void;
 }
 
@@ -22,40 +22,28 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onOpenAuth,
 }) => {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [enteredPin, setEnteredPin] = useState<string>('');
-  const [pinError, setPinError] = useState<string>('');
-
-  useEffect(() => {
-    setEnteredPin('');
-    setPinError('');
-  }, [isOpen, bill]);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   if (!isOpen || !bill) return null;
 
-  const isOwner = isBillOwner(bill, user, enteredPin);
-  const isProtectedWithPin = hasBillSecurityPin(bill);
-  const isProtectedWithAccount = hasBillOwnerAccount(bill);
+  const isOwner = isBillOwner(bill, user);
 
   const handleDelete = async () => {
-    setPinError('');
+    setErrorMsg('');
     if (!isOwner) {
-      if (isProtectedWithPin && enteredPin.trim().length < 4) {
-        setPinError('Please enter the 4-digit security PIN set on this bill / برائے مہربانی بل کا 4 ہندسوں کا سیکیورٹی پن درج کریں۔');
-      } else if (isProtectedWithAccount) {
-        setPinError('Access Denied: You must be logged into the creator account to delete this bill / رسائی مسترد: اس بل کو ڈیلیٹ کرنے کے لیے اصل اکاؤنٹ میں لاگ ان ہونا لازمی ہے۔');
-      } else {
-        setPinError('Access Denied: You are not authorized to delete this bill / رسائی مسترد: آپ اس بل کو ڈیلیٹ کرنے کے مجاز نہیں ہیں۔');
-      }
+      setErrorMsg(
+        'Access Denied: You must be logged into the verified creator account to delete this bill. / رسائی مسترد: صرف بل بنانے والا رجسٹرڈ اکاؤنٹ ہی اسے ڈیلیٹ کر سکتا ہے۔'
+      );
       return;
     }
 
     setIsDeleting(true);
     try {
-      await onConfirmDelete(bill.id, enteredPin.trim());
+      await onConfirmDelete(bill.id);
       onClose();
     } catch (err: any) {
       console.error('Delete error:', err);
-      setPinError(err.message || 'Failed to delete bill.');
+      setErrorMsg(err.message || 'Failed to delete bill.');
     } finally {
       setIsDeleting(false);
     }
@@ -79,24 +67,26 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         </button>
 
         <div className="text-center">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner ${
-            isOwner ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700'
-          }`}>
+          <div
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner ${
+              isOwner ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700'
+            }`}
+          >
             {isOwner ? <Trash2 size={26} className="stroke-[2.2]" /> : <Lock size={26} className="stroke-[2.2]" />}
           </div>
 
-          <h3 className="text-xl font-black text-slate-900">
-            {isOwner ? 'Delete Your Bill? / بل ڈیلیٹ کریں؟' : 'Deletion Strictly Locked / ڈیلیٹ لاک ہے'}
+          <h3 className="text-xl font-black text-black">
+            {isOwner ? 'Delete Your Bill? / بل ڈیلیٹ کریں؟' : 'Account Owner Required / صرف اصل اکاؤنٹ'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 font-urdu leading-relaxed">
             {isOwner
               ? 'کیا آپ واقعی اس بل کو ڈیٹا بیس سے مستقل ڈیلیٹ کرنا چاہتے ہیں؟'
-              : 'یہ بل 100% محفوظ ہے۔ صرف بل کا اصل مالک یا درست پن کوڈ والا شخص ہی اسے ڈیلیٹ کر سکتا ہے۔'}
+              : 'یہ بل محفوظ ہے۔ صرف اس بل کو اپلوڈ کرنے والا تصدیق شدہ اکاؤنٹ ہی اسے ڈیلیٹ کر سکتا ہے۔'}
           </p>
         </div>
 
         {/* Bill Summary */}
-        <div className="bg-white/90 p-3.5 rounded-2xl border border-slate-200/90 my-4 space-y-1.5 text-xs">
+        <div className="bg-white/95 p-3.5 rounded-2xl border border-slate-200/90 my-4 space-y-1.5 text-xs">
           <div className="flex justify-between items-center text-slate-500">
             <span>Category / نوعیت:</span>
             <span className="font-bold text-slate-900">{bill.bill_type}</span>
@@ -113,13 +103,13 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
         </div>
 
-        {/* Ownership Verification Feedback */}
+        {/* Ownership Status */}
         {isOwner ? (
-          <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-950 flex items-start gap-2 mb-5">
+          <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-950 flex items-start gap-2 mb-5">
             <ShieldCheck size={16} className="text-emerald-700 shrink-0 mt-0.5" />
             <div>
-              <strong className="block text-emerald-900">Verified Owner / آپ کی ملکیت تصدیق شدہ ہے:</strong>
-              This bill will be permanently removed from Supabase and will no longer appear on any device.
+              <strong className="block text-emerald-900">Verified Creator Account / آپ کی ملکیت تصدیق شدہ ہے:</strong>
+              This bill belongs to your logged-in account ({user?.fullName || user?.email}). It will be permanently removed.
             </div>
           </div>
         ) : (
@@ -127,32 +117,10 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-900 flex items-start gap-2">
               <AlertTriangle size={15} className="text-rose-600 shrink-0 mt-0.5" />
               <span>
-                <strong>Strict Protection Active:</strong> Anonymous deletion is completely disabled. You must verify ownership via your creator account or 4-digit PIN.
+                <strong>Access Restricted:</strong> You must be logged into the specific account that created this bill. Anonymous deletion is completely disabled.
               </span>
             </div>
 
-            {/* If PIN protected, provide PIN input */}
-            {isProtectedWithPin && (
-              <div className="bg-white p-3 rounded-2xl border border-emerald-200">
-                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-                  <KeyRound size={13} className="text-emerald-700" />
-                  <span>Enter 4-Digit Security PIN / 4 ہندسوں کا خفیہ پن</span>
-                </label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  value={enteredPin}
-                  onChange={(e) => {
-                    setEnteredPin(e.target.value);
-                    setPinError('');
-                  }}
-                  placeholder="••••"
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl text-center font-mono font-black tracking-widest text-base border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#34D399]"
-                />
-              </div>
-            )}
-
-            {/* Sign in with account option */}
             {onOpenAuth && (
               <div className="text-center pt-1">
                 <button
@@ -171,9 +139,9 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
         )}
 
-        {pinError && (
+        {errorMsg && (
           <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold text-center">
-            {pinError}
+            {errorMsg}
           </div>
         )}
 

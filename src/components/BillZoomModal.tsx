@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Trash2 } from 'lucide-react';
+import { X, Copy, Check, Building2 } from 'lucide-react';
 import { BillItem } from '../types/bill';
 import { AppUser } from '../types/user';
 import { BillPhotoPreview } from './BillPhotoPreview';
-import { cleanDisplayReference, isBillOwner, hasBillSecurityPin } from '../services/billService';
+import { cleanDisplayReference, extractBillBankAccount } from '../services/billService';
 
 interface BillZoomModalProps {
   bill: BillItem | null;
   isOpen: boolean;
   onClose: () => void;
   onPayClick: (bill: BillItem) => void;
-  onDeleteClick?: (bill: BillItem) => void;
   user?: AppUser | null;
 }
 
@@ -19,19 +18,25 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
   isOpen,
   onClose,
   onPayClick,
-  onDeleteClick,
-  user = null,
 }) => {
   const [copiedRef, setCopiedRef] = useState(false);
+  const [copiedBank, setCopiedBank] = useState(false);
 
   if (!isOpen || !bill) return null;
 
   const displayRef = cleanDisplayReference(bill.reference_no);
+  const attachedBank = extractBillBankAccount(bill.reference_no);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(cleanDisplayReference(text));
     setCopiedRef(true);
     setTimeout(() => setCopiedRef(false), 2000);
+  };
+
+  const handleCopyBank = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBank(true);
+    setTimeout(() => setCopiedBank(false), 2000);
   };
 
   const formattedAmount =
@@ -93,35 +98,45 @@ export const BillZoomModal: React.FC<BillZoomModalProps> = ({
               <span>{copiedRef ? 'Copied' : 'Copy Ref ID'}</span>
             </button>
           </div>
+
+          {/* Attached Beneficiary Receiving Pakistani Bank Account (JazzCash / EasyPaisa / Bank) */}
+          {attachedBank && (
+            <div className="mt-3 bg-emerald-50/90 p-3.5 rounded-2xl border border-emerald-300 flex items-center justify-between">
+              <div className="truncate mr-2">
+                <span className="text-[10px] font-bold text-emerald-800 flex items-center gap-1">
+                  <Building2 size={12} className="text-emerald-700" />
+                  <span>Direct Transfer / JazzCash / EasyPaisa / بینک اکاؤنٹ:</span>
+                </span>
+                <span className="text-xs font-bold text-slate-800 block mt-0.5 truncate">
+                  {attachedBank.bankName} · {attachedBank.accountTitle}
+                </span>
+                <span className="font-mono font-bold text-sm text-emerald-950 block truncate">
+                  {attachedBank.accountNumber}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopyBank(attachedBank.accountNumber)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+              >
+                {copiedBank ? <Check size={14} className="text-emerald-700" /> : <Copy size={14} />}
+                <span>{copiedBank ? 'Copied' : 'Copy Acc'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="mt-5 pt-3 border-t border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {onDeleteClick && (isBillOwner(bill, user) || hasBillSecurityPin(bill)) && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onDeleteClick(bill);
-                }}
-                className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                title="Delete this bill / بل ڈیلیٹ کریں"
-              >
-                <Trash2 size={14} />
-                <span>Delete Bill / بل ڈیلیٹ کریں</span>
-              </button>
-            )}
-            <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
-              بل ادا کرنے کے بعد رسید اپلوڈ کریں تاکہ بل فوراً ہٹ جائے
-            </div>
+          <div className="text-xs text-slate-600 font-urdu text-center sm:text-left">
+            بل ادا کرنے کے بعد رسید اپلوڈ کریں تاکہ ادائیگی کا مستقل ریکارڈ محفوظ ہو جائے
           </div>
           <button
             onClick={() => {
               onClose();
               onPayClick(bill);
             }}
-            className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black text-[#064E3B] flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            className="clay-mint-btn w-full sm:w-auto px-6 py-3 rounded-full text-xs sm:text-sm font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
             <span>I Paid This - Upload Receipt / رسید اپلوڈ کریں</span>
           </button>

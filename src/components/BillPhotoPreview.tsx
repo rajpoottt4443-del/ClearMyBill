@@ -79,11 +79,19 @@ export const BillPhotoPreview: React.FC<BillPhotoPreviewProps> = ({
         bgHeader: 'bg-rose-50 border-rose-200',
       };
     }
+    if (lower.includes('water') || lower.includes('پانی')) {
+      return {
+        icon: <Droplets size={16} className="text-sky-500 fill-sky-500" />,
+        label: 'MUNICIPAL WATER AGENCY',
+        labelUrdu: 'پانی و صفائی ادارہ (واسا)',
+        bgHeader: 'bg-sky-50 border-sky-200',
+      };
+    }
     return {
-      icon: <Droplets size={16} className="text-sky-500 fill-sky-500" />,
-      label: 'MUNICIPAL UTILITY AGENCY',
-      labelUrdu: 'پانی و صفائی ادارہ',
-      bgHeader: 'bg-sky-50 border-sky-200',
+      icon: <FileText size={16} className="text-emerald-700" />,
+      label: 'BILL VOUCHER / CHALLAN',
+      labelUrdu: 'دیگر بل و فیس واؤچر',
+      bgHeader: 'bg-emerald-50 border-emerald-200',
     };
   };
 

@@ -31,7 +31,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
           <span>Global Peer-to-Peer Relief</span>
           <span className="text-emerald-400">·</span>
           <span className="font-urdu font-bold text-emerald-950">
-            بلوں کی براہِ راست 48 گھنٹے میں ادائیگی
+            بلوں کی براہِ راست اور شفاف ادائیگی
           </span>
         </div>
 
@@ -42,17 +42,17 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
 
         {/* Bilingual Subtitle */}
         <p className="text-base sm:text-lg lg:text-xl font-bold text-[#1E293B] max-w-2xl mx-auto leading-relaxed">
-          The 48-Hour Peer-to-Peer Bill Relief Platform
+          Direct Peer-to-Peer Bill Relief Platform
         </p>
         <p className="text-sm sm:text-base text-emerald-900 font-urdu font-bold mt-1 max-w-xl mx-auto leading-relaxed">
-          ضرورت مند لوگ اپنے بل اپلوڈ کریں اور دنیا بھر کے مخیر حضرات 48 گھنٹے کے اندر براہِ راست بل یا رقم ادا کریں۔
+          ضرورت مند لوگ اپنے بل اپلوڈ کریں اور دنیا بھر کے مخیر حضرات براہِ راست بل یا رقم ادا کر کے مدد کریں۔
         </p>
 
         {/* Quick Dual Action Badges */}
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={onScrollToUpload}
-            className="clay-mint-btn px-6 py-3 rounded-full text-xs sm:text-sm font-black text-[#064E3B] flex items-center gap-2 cursor-pointer shadow-md"
+            className="clay-mint-btn px-6 py-3 rounded-full text-xs sm:text-sm font-black text-white flex items-center gap-2 cursor-pointer shadow-md"
           >
             <span>Upload a Bill / بل اپلوڈ کریں</span>
           </button>
@@ -71,8 +71,8 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
               <Clock size={16} />
             </div>
             <div>
-              <div className="text-xs font-black text-slate-900">48-Hour Goal</div>
-              <div className="text-[10px] text-slate-500 font-urdu">48 گھنٹے کا ہدف</div>
+              <div className="text-xs font-black text-slate-900">Direct Relief</div>
+              <div className="text-[10px] text-slate-500 font-urdu">براہِ راست امداد</div>
             </div>
           </div>
 
